@@ -1,0 +1,56 @@
+# Example tmuxinator layout for use with Twine
+# Save this to ~/.config/tmuxinator/dev.yml and configure:
+# set -gx TWINE_TMUXINATOR_LAYOUT dev
+
+# Session name - uses the name passed by twine
+name: dev
+
+# Whether to attach to session after creation
+# Twine passes false as first argument to create detached sessions
+attach: <%= @args[0] %>
+
+# Optional: Run commands when project starts
+# This example trusts and installs mise/rtx tools
+on_project_start: mise trust && mise install
+
+# Optional: Run commands only on first start
+# on_project_first_start: echo "First time setup"
+
+# Window configuration
+windows:
+  # First window - Editor layout with multiple panes
+  - editor:
+      # Custom layout (optional)
+      # Get layout with: tmux list-windows -F "#{window_layout}"
+      layout: f552,204x51,0,0{80x51,0,0[80x15,0,0,0,80x17,0,16,2,80x17,0,34,3],123x51,81,0,1}
+      panes:
+        - bin/rails console  # Example: Rails console
+        - git diff          # Show current changes
+        - git status        # Show git status
+        - nvim              # Open editor
+
+  # Second window - Server/logs
+  - server: ls            # Start in directory, ready for commands
+
+  # Additional window examples:
+  # - tests:
+  #     panes:
+  #       - npm test --watch
+  #       - npm run lint
+
+  # - docker:
+  #     root: ./docker
+  #     panes:
+  #       - docker-compose up
+  #       - docker-compose logs -f
+
+# Environment variables (optional)
+# environment:
+#   EDITOR: nvim
+#   RAILS_ENV: development
+
+# Pre-window commands (run in each window before panes)
+# pre_window: source .env
+
+# Startup directory (optional, twine sets this via -c flag)
+# root: ~/src/myproject

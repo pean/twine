@@ -1,0 +1,23 @@
+#!/usr/bin/env fish
+
+# Test runner for twine plugin
+# Requires fishtape: fisher install jorgebucaran/fishtape
+
+if not command -v fishtape >/dev/null
+    echo "Error: fishtape not installed"
+    echo "Install with: fisher install jorgebucaran/fishtape"
+    exit 1
+end
+
+# Run all tests
+echo "Running twine tests..."
+echo ""
+
+set test_files tests/*.test.fish
+
+if test (count $test_files) -eq 0
+    echo "No test files found in tests/"
+    exit 1
+end
+
+fishtape $test_files
