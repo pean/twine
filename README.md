@@ -392,6 +392,50 @@ Contributions welcome! Please:
 4. Ensure all tests pass
 5. Submit a pull request
 
+**Commit Message Format:**
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+<type>: <description>
+
+[optional body]
+```
+
+Types:
+- `feat:` - New feature (bumps MINOR version)
+- `fix:` - Bug fix (bumps PATCH version)
+- `docs:` - Documentation changes
+- `test:` - Test changes
+- `chore:` - Maintenance tasks
+- `refactor:` - Code refactoring
+- `BREAKING CHANGE:` - Breaking changes (bumps MAJOR version)
+
+Examples:
+```bash
+git commit -m "feat: add interactive branch selection"
+git commit -m "fix: resolve session switching issue"
+git commit -m "docs: update installation instructions"
+```
+
+### Releases
+
+Releases are managed automatically using [release-please](https://github.com/googleapis/release-please).
+
+**CHANGELOG:** Maintained automatically based on conventional commits.
+
+**Creating a release:**
+
+1. Ensure all changes are committed and pushed to master
+2. Trigger the release workflow:
+   ```bash
+   gh workflow run release-please.yml
+   ```
+3. Review and merge the automated Release PR
+4. Git tag and GitHub release are created automatically
+
+**Version scheme:** [Semantic Versioning](https://semver.org/) (MAJOR.MINOR.PATCH)
+
 ## Uninstall
 
 ```fish
