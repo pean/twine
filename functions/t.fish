@@ -46,7 +46,7 @@ function t --description 'Switch to tmux session for repo'
     if tmux has-session >/dev/null 2>&1
         for name in $names
             if tmux list-sessions | grep -q "^$name:" 2>/dev/null
-                __twine_attach$name
+                __twine_attach $name
                 return
             end
         end
@@ -71,11 +71,11 @@ function t --description 'Switch to tmux session for repo'
             else
                 tmux new-session -d -s $name -c $repo_path
             end
-            __twine_attach$name
+            __twine_attach $name
             return
         end
     end
 
     # No repo found, create basic session with the provided name
-    __twine_attach$names[2]
+    __twine_attach $names[2]
 end
