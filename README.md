@@ -6,12 +6,13 @@ Twine helps you seamlessly manage git worktrees and tmux sessions, making it eas
 
 ## Features
 
+- **Interactive selection**: Call `t` or `tw` without arguments for fzf-powered selection
+- **Visual indicators**: Running sessions marked with ▶, available repos with 📁
 - **Multi-directory support**: Search for repositories across multiple base directories
 - **Auto-create worktrees**: Automatically create git worktrees from remote branches
-- **Interactive branch selection**: FZF-powered fuzzy finder for branches and worktrees
 - **Smart session management**: Create and switch between tmux sessions for each worktree
 - **Optional tmuxinator integration**: Use custom layouts or fall back to basic tmux sessions
-- **Tab completion**: Intelligent completion for repos, branches, and sessions
+- **Tab completion**: Intelligent completion prioritizing active sessions over repos
 
 ## Requirements
 
@@ -100,12 +101,15 @@ Main command for creating and switching to git worktree tmux sessions.
 
 **Usage:**
 ```fish
-twine worktree <repo> [branch]
-tw <repo> [branch]              # Shortcut
+twine worktree [repo] [branch]
+tw [repo] [branch]              # Shortcut
 ```
 
 **Examples:**
 ```fish
+# Interactive repo selection (shows running sessions ▶ and repos 📁)
+tw
+
 # Interactive branch selection with fzf
 tw my-project
 
@@ -117,10 +121,12 @@ tw my-project.git develop
 ```
 
 **Features:**
+- Interactive fzf selection when called without arguments
 - Auto-detects bare repos (`.git` suffix) or regular repos
 - Fetches latest remote branches before selection
 - Creates worktrees from remote branches automatically
 - Switches to existing tmux session or creates new one
+- Visual indicators: ▶ for active worktrees, 📁 for remote branches
 
 ### `session` - Session Switcher
 
@@ -128,18 +134,26 @@ Quick session switcher for existing repos.
 
 **Usage:**
 ```fish
-twine session <repo>
-t <repo>                # Shortcut
+twine session [repo]
+t [repo]                # Shortcut
 ```
 
 **Examples:**
 ```fish
+# Interactive selection (shows running sessions ▶ and repos 📁)
+t
+
 # Switch to repo session (searches all base directories)
 t my-project
 
 # Creates session if repo exists but session doesn't
 t another-repo
 ```
+
+**Features:**
+- Interactive fzf selection when called without arguments
+- Prioritizes running sessions at the top of completions
+- Visual indicators: ▶ for active sessions, 📁 for available repos
 
 ### `attach` - Tmux Attach
 
@@ -293,11 +307,12 @@ This allows you to:
 
 ## Tips
 
-- Use `tw` without a branch argument for interactive fzf selection
-- Tab completion shows existing worktrees and remote branches
+- Call `t` or `tw` without arguments for interactive fzf selection
+- Tab completion shows running sessions first (▶), then available repos (📁)
 - Sessions are automatically created with your configured layout
 - Works with both bare repos (`.git`) and regular repos
 - Supports multiple base directories - repos are searched in order
+- Visual indicators help distinguish active sessions from available options
 
 ## Development
 
