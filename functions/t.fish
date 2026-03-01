@@ -28,9 +28,47 @@ function t --description 'Switch to tmux session for repo'
     end
 
     if test (count $argv) -lt 1
-        echo "Usage: t <repo>"
-        echo "Run 't --help' for more information"
-        return 1
+        if not command -v fzf >/dev/null
+            echo "Usage: t <repo>"
+            echo "Run 't --help' for more information"
+            echo ""
+            echo "Tip: Install fzf for interactive selection"
+            return 1
+        end
+
+        # Get running sessions
+        set sessions
+        if tmux has-session >/dev/null 2>&1
+            set sessions (tmux list-sessions -F '#S')
+        end
+
+        # Get available repos
+        set repos
+        if set -q TWINE_BASE_DIRS
+            for base_dir in $TWINE_BASE_DIRS
+                if test -d $base_dir
+                    for dir in $base_dir/*/
+                        set repo (basename $dir)
+                        if not contains $repo $sessions
+                            set repos $repos $repo
+                        end
+                    end
+                end
+            end
+        end
+
+        # Show selection menu
+        set selection (begin
+            echo $sessions | tr ' ' '\n' | sed 's|$| ▶|'
+            echo $repos | tr ' ' '\n' | sed 's|$| 📁|'
+        end | fzf --height=40% --prompt="Select session or repo: ")
+
+        if test -z "$selection"
+            return 1
+        end
+
+        # Remove the symbol and use as argument
+        set argv (string replace -r ' [▶📁]$' '' $selection)
     end
 
     if not set -q TWINE_BASE_DIRS

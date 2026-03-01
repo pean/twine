@@ -27,17 +27,56 @@ function tw --description 'Switch to tmux session for a worktree (creates worktr
         return 0
     end
 
-    if test (count $argv) -lt 1
-        echo "Usage: tw <repo> [branch]"
-        echo "Run 'tw --help' for more information"
-        return 1
-    end
-
     # Check for required configuration
     if not set -q TWINE_BASE_DIRS
         echo "Error: TWINE_BASE_DIRS not configured"
         echo "Add to ~/.config/fish/config.fish: set -gx TWINE_BASE_DIRS ~/src/repos"
         return 1
+    end
+
+    if test (count $argv) -lt 1
+        if not command -v fzf >/dev/null
+            echo "Usage: tw <repo> [branch]"
+            echo "Run 'tw --help' for more information"
+            echo ""
+            echo "Tip: Install fzf for interactive selection"
+            return 1
+        end
+
+        # Get running sessions (extract repo name from "repo/worktree" format)
+        set running_sessions
+        if tmux has-session >/dev/null 2>&1
+            set running_sessions (tmux list-sessions -F '#S' | grep '/' | sed 's|/.*||' | sort -u)
+        end
+
+        # Get available repos
+        set repos
+        for base_dir in $TWINE_BASE_DIRS
+            if test -d $base_dir
+                for dir in $base_dir/*.git/
+                    if test -d $dir
+                        set name (basename $dir)
+                        set repo_name (string replace '.git' '' $name)
+                        if not contains $repo_name $running_sessions
+                            set repos $repos $repo_name
+                        end
+                    end
+                end
+            end
+        end
+
+        # Show selection menu
+        set selection (begin
+            echo $running_sessions | tr ' ' '\n' | sed 's|$| ▶|'
+            echo $repos | tr ' ' '\n' | sed 's|$| 📁|'
+        end | fzf --height=40% --prompt="Select repo: ")
+
+        if test -z "$selection"
+            return 1
+        end
+
+        # Remove the symbol and use as argument
+        set argv (string replace -r ' [▶📁]$' '' $selection)
     end
 
     # Strip .git suffix if provided
@@ -125,16 +164,16 @@ function tw --description 'Switch to tmux session for a worktree (creates worktr
 
         # Combine and show in fzf
         set selection (begin
-            echo $existing_worktrees | tr ' ' '\n' | sed 's|$| (worktree)|'
-            echo $remote_branches | tr ' ' '\n' | sed 's|$| (remote)|'
+            echo $existing_worktrees | tr ' ' '\n' | sed 's|$| ▶|'
+            echo $remote_branches | tr ' ' '\n' | sed 's|$| 📁|'
         end | sort -u | fzf --height=40% --prompt="Select branch for $repo: ")
 
         if test -z "$selection"
             return 1
         end
 
-        # Remove the label
-        set branch (string replace -r ' \(.*\)$' '' $selection)
+        # Remove the symbol
+        set branch (string replace -r ' [▶📁]$' '' $selection)
     else
         set branch $argv[2]
     end

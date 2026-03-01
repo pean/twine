@@ -1,10 +1,16 @@
 function __tw_complete_repos
-    # Show existing tmux sessions (extract repo name from "repo/worktree" format)
+    # Get list of running sessions (extract repo name from "repo/worktree" format)
+    set running_sessions
     if tmux has-session >/dev/null 2>&1
-        tmux list-sessions -F '#S' | grep '/' | sed 's|/.*||' | sort -u
+        set running_sessions (tmux list-sessions -F '#S' | grep '/' | sed 's|/.*||' | sort -u)
     end
 
-    # Add directories from all base directories that end with .git
+    # Show running sessions first with ▶ symbol
+    for session in $running_sessions
+        echo -e "$session\t▶"
+    end
+
+    # Add directories from all base directories that end with .git with 📁 symbol
     if set -q TWINE_BASE_DIRS
         for base_dir in $TWINE_BASE_DIRS
             if test -d $base_dir
@@ -12,7 +18,11 @@ function __tw_complete_repos
                     if test -d $dir
                         set name (basename $dir)
                         # Remove .git suffix for completion
-                        string replace '.git' '' $name
+                        set repo (string replace '.git' '' $name)
+                        # Skip if already shown as running session
+                        if not contains $repo $running_sessions
+                            echo -e "$repo\t📁"
+                        end
                     end
                 end
             end
@@ -61,15 +71,15 @@ function __tw_complete_branches
         sed 's|^[* ]*origin/||' | \
         grep -v '^HEAD')
 
-    # Output existing worktrees with label
+    # Output existing worktrees with symbol
     for wt in $existing_worktrees
-        echo -e "$wt\tworktree"
+        echo -e "$wt\t▶"
     end
 
-    # Output remote branches (excluding those with worktrees) with label
+    # Output remote branches (excluding those with worktrees) with symbol
     for branch in $remote_branches
         if not contains $branch $existing_worktrees
-            echo -e "$branch\tremote"
+            echo -e "$branch\t📁"
         end
     end
 end
