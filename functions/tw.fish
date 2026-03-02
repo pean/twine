@@ -197,6 +197,8 @@ function tw --description 'Switch to tmux session for a worktree (creates worktr
                 # Local branch exists, use it
                 if git -C $repo_path worktree add $branch $branch 2>&1
                     echo "✓ Worktree created: $branch"
+                    # Set upstream tracking if not already configured
+                    git -C $repo_path branch --set-upstream-to=origin/$branch $branch 2>/dev/null
                 else
                     echo "✗ Failed to create worktree"
                     return 1
