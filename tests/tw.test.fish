@@ -88,6 +88,78 @@ set branch "feature/test"
 set worktree_path $repo_path/$branch
 @test "tw builds correct worktree path" (test "$worktree_path" = "$test_dir/repos/test-repo.git/feature/test") $status -eq 0
 
+# Test: tw parses --create flag
+set argv test-repo feature/new --create
+set create_branch 0
+set positional_args
+for arg in $argv
+    switch $arg
+        case -c --create
+            set create_branch 1
+        case '*'
+            set positional_args $positional_args $arg
+    end
+end
+@test "tw parses --create flag" (test $create_branch -eq 1) $status -eq 0
+
+# Test: tw parses -c flag
+set argv test-repo feature/new -c
+set create_branch 0
+set positional_args
+for arg in $argv
+    switch $arg
+        case -c --create
+            set create_branch 1
+        case '*'
+            set positional_args $positional_args $arg
+    end
+end
+@test "tw parses -c flag" (test $create_branch -eq 1) $status -eq 0
+
+# Test: tw parses --from flag with base branch
+set argv test-repo feature/new -c -f develop
+set base_branch ""
+set parse_from 0
+for arg in $argv
+    switch $arg
+        case -f --from
+            set parse_from 1
+        case '*'
+            if test $parse_from -eq 1
+                set base_branch $arg
+                set parse_from 0
+            end
+    end
+end
+@test "tw parses --from flag with base branch" (test "$base_branch" = "develop") $status -eq 0
+
+# Test: tw extracts positional args correctly with flags
+set argv test-repo feature/new -c -f develop
+set create_branch 0
+set base_branch ""
+set positional_args
+set parse_from 0
+for arg in $argv
+    switch $arg
+        case -c --create
+            set create_branch 1
+        case -f --from
+            set parse_from 1
+        case '*'
+            if test $parse_from -eq 1
+                set base_branch $arg
+                set parse_from 0
+            else
+                set positional_args $positional_args $arg
+            end
+    end
+end
+@test "tw extracts positional args correctly with flags" (test (count $positional_args) -eq 2; and test "$positional_args[1]" = "test-repo"; and test "$positional_args[2]" = "feature/new") $status -eq 0
+
+# Test: tw shows help with --help flag
+set output (tw --help 2>&1)
+@test "tw shows help with --help flag" (string match -q "*--create*" -- $output; and string match -q "*--from*" -- $output) $status -eq 0
+
 # Cleanup
 rm -rf $test_dir
 set -e TWINE_BASE_DIRS

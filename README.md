@@ -22,12 +22,19 @@ tw my-project feature/login
 
 # Start work on a remote branch you haven't checked out yet
 tw my-project origin/hotfix/critical-bug
+
+# Create a new branch and worktree from main/master
+tw my-project feature/new-feature --create
+
+# Create a new branch from a specific base branch
+tw my-project feature/new-feature -c -f develop
 ```
 
 **Real scenario:** You're coding in `feature/payment` when a critical bug is
 reported. Run `tw my-project hotfix/security-fix` to instantly switch to a fresh
 environment. Your payment feature work stays running with its dev server and
-tests untouched.
+tests untouched. Need to start a new feature? Use `tw my-project feature/login -c`
+to create a new branch and worktree in one command.
 
 ### Quick Project Navigation
 
@@ -164,6 +171,7 @@ Twine will search all these directories for repositories when you run `tw` or `t
 - **Visual indicators**: Running sessions marked with ▶, available repos with 📁
 - **Multi-directory support**: Search for repositories across multiple base directories
 - **Auto-create worktrees**: Automatically create git worktrees from remote branches
+- **Create new branches**: Create new branches with worktrees using `--create` flag
 - **Smart session management**: Create and switch between tmux sessions for each worktree
 - **Optional tmuxinator integration**: Use custom layouts or fall back to basic tmux sessions
 - **Tab completion**: Intelligent completion prioritizing active sessions over repos
@@ -222,11 +230,13 @@ set -gx TWINE_USE_TMUXINATOR auto
 ### Quick Reference
 
 ```fish
-tw [repo] [branch]     # Work on a specific branch (main command)
-t [repo]               # Switch to a project (no branch selection)
-ts                     # Launch tmuxinator in current repo
+tw [repo] [branch] [options]  # Work on a specific branch (main command)
+  -c, --create                # Create new branch if it doesn't exist
+  -f, --from BRANCH           # Base branch for new branch
+t [repo]                      # Switch to a project (no branch selection)
+ts                            # Launch tmuxinator in current repo
 twine init <name> <url> [branch]  # Set up new repo
-twine convert <repo>   # Convert existing repo to worktrees
+twine convert <repo>          # Convert existing repo to worktrees
 ```
 
 **Getting help:**
@@ -240,15 +250,29 @@ tw --help                 # Help for worktree command
 Branch-focused workflow - creates worktrees and switches to branch-specific sessions.
 
 ```fish
-tw [repo] [branch]
-twine worktree [repo] [branch]  # Verbose form
+tw [repo] [branch] [options]
+twine worktree [repo] [branch] [options]  # Verbose form
 ```
 
+**Options:**
+- `-c, --create` - Create new branch if it doesn't exist
+- `-f, --from BRANCH` - Base branch for new branch (default: main/master)
+
+**Examples:**
+```fish
+tw my-project feature/login              # Switch to existing branch
+tw my-project feature/new -c             # Create new branch from main/master
+tw my-project feature/new -c -f develop  # Create new branch from develop
+```
+
+**Features:**
 - Without args: Interactive fzf selection of all repos and branches
 - With repo only: Interactive branch selection for that repo
 - With repo and branch: Direct switch (creates worktree if needed)
 - Fetches latest remote branches before selection
 - Auto-creates worktrees from remote branches
+- Creates new branches with `--create` flag
+- Auto-detects default branch (main/master) or use `--from` to specify
 - Visual indicators: ▶ for active, 📁 for available
 
 ### `t` (session)

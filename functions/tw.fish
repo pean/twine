@@ -3,22 +3,29 @@ function tw --description 'Switch to tmux session for a worktree (creates worktr
     if test "$argv[1]" = "--help"; or test "$argv[1]" = "-h"
         echo "tw - Worktree + tmux session manager"
         echo ""
-        echo "Usage: tw [repo] [branch]"
+        echo "Usage: tw [repo] [branch] [options]"
         echo ""
         echo "Arguments:"
         echo "  repo     Repository name (optional, uses fzf if not provided)"
         echo "  branch   Branch/worktree name (optional, uses fzf if not provided)"
         echo ""
+        echo "Options:"
+        echo "  -c, --create       Create new branch if it doesn't exist"
+        echo "  -f, --from BRANCH  Base branch for new branch (default: main/master)"
+        echo ""
         echo "Examples:"
-        echo "  tw                         # Interactive repo and branch selection"
-        echo "  tw my-project              # Interactive branch selection"
-        echo "  tw my-project main         # Switch to main branch worktree"
-        echo "  tw my-project feature/x    # Creates worktree if doesn't exist"
+        echo "  tw                              # Interactive repo and branch selection"
+        echo "  tw my-project                   # Interactive branch selection"
+        echo "  tw my-project main              # Switch to main branch worktree"
+        echo "  tw my-project feature/x         # Creates worktree from remote"
+        echo "  tw my-project feature/x -c      # Create new branch from main/master"
+        echo "  tw my-project feature/x -c -f develop  # Create from develop"
         echo ""
         echo "Features:"
         echo "  - Interactive fzf selection for repos and branches"
         echo "  - Auto-detects bare (.git) and regular repos"
         echo "  - Creates worktrees from remote branches"
+        echo "  - Creates new branches with --create flag"
         echo "  - Fetches latest branches before selection"
         echo "  - Creates or switches to tmux session"
         echo "  - Offers to convert regular repos to bare"
@@ -29,6 +36,31 @@ function tw --description 'Switch to tmux session for a worktree (creates worktr
         echo "See also: twine init, twine convert"
         return 0
     end
+
+    # Parse flags
+    set create_branch 0
+    set base_branch ""
+    set positional_args
+
+    for arg in $argv
+        switch $arg
+            case -c --create
+                set create_branch 1
+            case -f --from
+                # Next arg will be the base branch
+                set parse_from 1
+            case '*'
+                if set -q parse_from
+                    set base_branch $arg
+                    set -e parse_from
+                else
+                    set positional_args $positional_args $arg
+                end
+        end
+    end
+
+    # Replace argv with positional arguments
+    set argv $positional_args
 
     # Check for required configuration
     if not set -q TWINE_BASE_DIRS
@@ -213,11 +245,45 @@ function tw --description 'Switch to tmux session for a worktree (creates worktr
                 end
             end
         else
-            echo "Error: Branch '$branch' not found on remote"
-            echo ""
-            echo "Available remote branches:"
-            git -C $repo_path branch -r | sed 's|^[* ]*origin/||' | grep -v '^HEAD' | head -10
-            return 1
+            # Branch not found on remote
+            if test $create_branch -eq 1
+                # Determine base branch
+                if test -z "$base_branch"
+                    # Auto-detect default branch
+                    set default_branch (git -C $repo_path symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|^refs/remotes/origin/||')
+                    if test -z "$default_branch"
+                        # Fallback: check for main or master
+                        if git -C $repo_path branch -r 2>/dev/null | grep -q "origin/main\$"
+                            set default_branch main
+                        else if git -C $repo_path branch -r 2>/dev/null | grep -q "origin/master\$"
+                            set default_branch master
+                        else
+                            echo "Error: Could not determine default branch"
+                            echo "Use --from to specify base branch explicitly"
+                            return 1
+                        end
+                    end
+                    set base_branch $default_branch
+                end
+
+                echo "Creating new branch '$branch' from '$base_branch'..."
+
+                # Create worktree with new branch
+                if git -C $repo_path worktree add -b $branch $branch origin/$base_branch 2>&1
+                    echo "✓ Worktree and branch created: $branch"
+                else
+                    echo "✗ Failed to create worktree"
+                    return 1
+                end
+            else
+                echo "Error: Branch '$branch' not found on remote"
+                echo ""
+                echo "Available remote branches:"
+                git -C $repo_path branch -r | sed 's|^[* ]*origin/||' | grep -v '^HEAD' | head -10
+                echo ""
+                echo "Tip: Use -c or --create to create a new branch"
+                return 1
+            end
         end
     end
 
