@@ -249,21 +249,20 @@ function tw --description 'Switch to tmux session for a worktree (creates worktr
             if test $create_branch -eq 1
                 # Determine base branch
                 if test -z "$base_branch"
-                    # Auto-detect default branch
-                    set default_branch (git -C $repo_path symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|^refs/remotes/origin/||')
-                    if test -z "$default_branch"
-                        # Fallback: check for main or master
-                        if git -C $repo_path branch -r 2>/dev/null | grep -q "origin/main\$"
-                            set default_branch main
-                        else if git -C $repo_path branch -r 2>/dev/null | grep -q "origin/master\$"
-                            set default_branch master
-                        else
+                    # Auto-detect default branch - check main/master first
+                    if git -C $repo_path branch -r 2>/dev/null | grep -q "origin/main\$"
+                        set base_branch main
+                    else if git -C $repo_path branch -r 2>/dev/null | grep -q "origin/master\$"
+                        set base_branch master
+                    else
+                        # Try symbolic-ref as fallback
+                        set base_branch (git -C $repo_path symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|^refs/remotes/origin/||')
+                        if test -z "$base_branch"
                             echo "Error: Could not determine default branch"
                             echo "Use --from to specify base branch explicitly"
                             return 1
                         end
                     end
-                    set base_branch $default_branch
                 end
 
                 echo "Creating new branch '$branch' from '$base_branch'..."
