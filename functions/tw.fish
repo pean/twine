@@ -197,9 +197,14 @@ function tw --description 'Switch to tmux session for a worktree (creates worktr
             sed 's|^[* ]*origin/||' | \
             grep -v '^HEAD')
 
+        # Get local branches
+        set local_branches (git -C $repo_path branch 2>/dev/null | \
+            sed 's|^[* ]*||')
+
         # Combine and show in fzf
         set selection (begin
             echo $existing_worktrees | tr ' ' '\n' | sed 's|$| ▶|'
+            echo $local_branches | tr ' ' '\n' | sed 's|$| 📁|'
             echo $remote_branches | tr ' ' '\n' | sed 's|$| 📁|'
         end | sort -u | fzf --height=40% --prompt="Select branch for $repo: ")
 
