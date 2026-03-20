@@ -272,9 +272,23 @@ function tw --description 'Switch to tmux session for a worktree (creates worktr
 
                 echo "Creating new branch '$branch' from '$base_branch'..."
 
+                # Determine starting point (prefer remote, fall back to local)
+                set start_point ""
+                if git -C $repo_path branch -r 2>/dev/null | grep -q "origin/$base_branch\$"
+                    set start_point origin/$base_branch
+                else if git -C $repo_path branch --list $base_branch | grep -q "."
+                    set start_point $base_branch
+                else
+                    echo "Error: Base branch '$base_branch' not found (neither origin/$base_branch nor local $base_branch exist)"
+                    echo ""
+                    echo "Available branches:"
+                    git -C $repo_path branch -a | head -10
+                    return 1
+                end
+
                 # Create worktree with new branch
-                if git -C $repo_path worktree add -b $branch $branch origin/$base_branch 2>&1
-                    echo "✓ Worktree and branch created: $branch"
+                if git -C $repo_path worktree add -b $branch $branch $start_point 2>&1
+                    echo "✓ Worktree and branch created: $branch (from $start_point)"
                 else
                     echo "✗ Failed to create worktree"
                     return 1
