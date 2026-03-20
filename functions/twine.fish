@@ -21,6 +21,12 @@ function twine --description 'Git worktree + tmux session management'
             __twine_init $argv[2..]
         case convert
             __twine_convert $argv[2..]
+        case prune
+            __twine_prune $argv[2..]
+        case agents
+            agents $argv[2..]
+        case kill tk
+            tk $argv[2..]
         case '*'
             echo "Error: Unknown action '$action'"
             echo ""
@@ -41,6 +47,9 @@ function __twine_help --description 'Show twine help'
     echo "  attach      Attach to tmux session"
     echo "  init        Initialize new bare repo"
     echo "  convert     Convert regular repo to bare"
+    echo "  prune       Pull default branch and clean up merged worktrees"
+    echo "  agents      List and switch to AI coding agents"
+    echo "  kill        Kill tmux sessions with optional worktree removal (shortcut: tk)"
     echo ""
     echo "Shortcuts:"
     echo "  tw          Same as 'twine worktree'"
@@ -55,6 +64,9 @@ function __twine_help --description 'Show twine help'
     echo "  twine start                      # Start tmuxinator in current repo"
     echo "  twine init my-proj <url>         # Clone as bare repo"
     echo "  twine convert my-proj            # Convert to bare repo"
+    echo "  twine prune my-proj              # Clean up merged worktrees"
+    echo "  twine kill                       # Interactively kill sessions"
+    echo "  twine kill my-proj/main -w       # Kill session and remove worktree"
     echo ""
     echo "  tw my-project                    # Shortcut for 'twine worktree'"
     echo "  t my-project                     # Shortcut for 'twine session'"

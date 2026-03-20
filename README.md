@@ -235,6 +235,8 @@ tw [repo] [branch] [options]  # Work on a specific branch (main command)
   -f, --from BRANCH           # Base branch for new branch
 t [repo]                      # Switch to a project (no branch selection)
 ts                            # Launch tmuxinator in current repo
+agents                        # List and switch to AI coding agents (Claude Code & OpenCode)
+tk [--worktree|-w] [session] # Kill tmux sessions with optional worktree removal
 twine init <name> <url> [branch]  # Set up new repo
 twine convert <repo>          # Convert existing repo to worktrees
 ```
@@ -341,6 +343,86 @@ twine attach <session-name>
 
 Used internally by `tw` and `t`. Use those commands instead for better
 integration with git worktrees.
+
+### `agents`
+
+AI agent dashboard - lists and switches between AI coding agents (Claude Code & OpenCode) running in tmux sessions.
+
+```fish
+agents
+twine agents  # Verbose form
+```
+
+**Features:**
+- Detects Claude Code agents via `~/.claude/sessions/` metadata
+- Detects OpenCode agents via process detection in tmux panes
+- Shows session name, directory, model (for Claude Code), and **real-time state**
+- Interactive fzf selection with visual indicators:
+  - 🤖 Claude Code sessions
+  - 🔓 OpenCode sessions
+- **Agent states** (with color coding):
+  - ⚡Working (yellow) - actively processing or running tools
+  - ❗Input (magenta) - **awaiting user approval** (highlighted!)
+  - ⏸ Idle (green) - ready for new prompts
+  - 🆕 New (cyan) - no interaction yet
+- Works from any tmux session or outside tmux
+
+**Tmux popup keybinding:**
+
+Add to your `~/.tmux.conf`:
+```tmux
+bind-key a display-popup -E -w 90% -h 90% "agents"
+```
+
+Then press `prefix + a` to open the agents dashboard in a popup.
+
+**Workflow example:**
+```fish
+# Set up worktrees for different branches
+tw myproject main
+tw myproject feature/api
+
+# Start different AI agents in each session
+tmux switch-client -t myproject/main
+claude-code  # Start Claude Code here
+
+tmux switch-client -t myproject/feature/api
+opencode     # Start OpenCode here
+
+# View all agents and switch between them
+agents
+# Or: prefix + a (with tmux keybinding)
+```
+
+
+### `kill` / `tk`
+
+Kill tmux sessions, with optional git worktree removal.
+
+```fish
+tk [--worktree|-w] [session-name...]
+twine kill [--worktree|-w] [session-name...]
+```
+
+**Options:**
+- `-w, --worktree` - Also remove the git worktree for each killed session
+
+**Examples:**
+```fish
+tk                              # Interactive multi-select of all sessions
+tk my-project/main              # Kill a specific session directly
+tk my-project/main -w           # Kill session and remove its worktree
+tk my-project/main my-project/feature -w  # Kill multiple + remove worktrees
+```
+
+**Tmux popup keybinding:**
+
+Add to your `~/.tmux.conf`:
+```tmux
+bind-key k display-popup -E -w 90% -h 90% "tk"
+```
+
+Then press `prefix + k` to open the kill dashboard in a popup.
 
 ## Tmuxinator Setup (Optional)
 
