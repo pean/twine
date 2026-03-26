@@ -10,3 +10,7 @@
 
 # Fish
 *.fish~
+
+# Go build output
+bin/
+/twine

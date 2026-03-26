@@ -1,554 +1,210 @@
 # 🌿 Twine
 
-> Intertwined branches and sessions - Fish shell plugin for git worktree + tmux session management
+> Git worktree + tmux session management
 
-Twine helps you seamlessly manage git worktrees and tmux sessions, making it easy to work on multiple branches simultaneously with dedicated terminal environments for each.
-
-## What You Can Do
-
-### Work on Multiple Branches Simultaneously
-
-**`tw` - Your main command for branch-based workflows**
-
-Jump between branches instantly, each in their own tmux session. Perfect for when
-you're juggling feature work, code review, and hotfixes.
-
-```fish
-# Pick from all your projects and branches interactively
-tw
-
-# Jump to a specific branch (creates worktree if needed)
-tw my-project feature/login
-
-# Start work on a remote branch you haven't checked out yet
-tw my-project origin/hotfix/critical-bug
-
-# Create a new branch and worktree from main/master
-tw my-project feature/new-feature --create
-
-# Create a new branch from a specific base branch
-tw my-project feature/new-feature -c -f develop
-```
-
-**Real scenario:** You're coding in `feature/payment` when a critical bug is
-reported. Run `tw my-project hotfix/security-fix` to instantly switch to a fresh
-environment. Your payment feature work stays running with its dev server and
-tests untouched. Need to start a new feature? Use `tw my-project feature/login -c`
-to create a new branch and worktree in one command.
-
-### Quick Project Navigation
-
-**`t` - Fast switching between your projects**
-
-Switch to any project's main session without specifying a branch. Great for when
-you just need to jump into a project.
-
-```fish
-# Interactive selection of all your projects
-t
-
-# Jump directly to a project
-t my-project
-```
-
-**Real scenario:** Need to quickly check something in your docs repo or run a
-script? `t docs` gets you there instantly without the branch selection step.
-
-### Set Up New Projects
-
-**`init` - Start fresh with the worktree pattern**
-
-Setting up a new repository for the first time? Get it configured correctly from
-the start.
-
-```fish
-# Clone and set up for multi-branch work
-twine init my-project git@github.com:user/my-project.git
-
-# Start with a specific branch
-twine init my-project git@github.com:user/my-project.git develop
-```
-
-**Real scenario:** Starting a new job or project. Use `init` to clone the repo
-as bare with worktree support, so you're ready to work on multiple features from
-day one.
-
-### Migrate Existing Projects
-
-**`convert` - Upgrade regular repos to use worktrees**
-
-Already have a repo? Convert it to the bare + worktree pattern to unlock
-parallel branch workflows.
-
-```fish
-# Convert your existing repo
-twine convert my-project
-```
-
-**Real scenario:** You've been using a regular repo but now need to work on a
-feature branch while keeping main available for hotfixes. Convert it once and
-enjoy the worktree workflow.
-
-### Launch Custom Layouts
-
-**`ts` - Start tmuxinator sessions**
-
-If you use tmuxinator for custom window/pane layouts, launch them in your
-current repo.
-
-```fish
-# From within any git repository
-cd ~/src/my-project/feature-branch
-ts
-```
-
-**Real scenario:** You have a tmuxinator layout with editor, tests, and logs
-panes. Jump into any worktree and run `ts` to get your preferred setup instantly.
-
-## Directory Structure Explained
-
-Twine uses git's worktree feature to let you work on multiple branches at the same
-time. Here's how your repositories get organized:
-
-### Bare Repository Pattern (Recommended)
-
-```
-~/src/work/
-├── my-project.git/           # Bare repository (no working files)
-│   ├── HEAD, config, objects/, refs/  # Git internals
-│   ├── main/                 # Worktree: main branch
-│   │   ├── src/
-│   │   ├── package.json
-│   │   └── ...               # Full working directory
-│   ├── develop/              # Worktree: develop branch
-│   │   ├── src/
-│   │   └── ...
-│   └── feature/
-│       └── new-login/        # Worktree: feature/new-login branch
-│           ├── src/
-│           └── ...
-```
-
-**How it works:**
-- `my-project.git/` is the bare repository (just git data, no files to edit)
-- Each subdirectory (`main/`, `develop/`, etc.) is a complete working directory
-- Each worktree is checked out to a different branch
-- All worktrees share the same git history and objects (efficient!)
-- Each worktree can have its own running processes, uncommitted changes, etc.
-
-**Tmux sessions match the structure:**
-- `my-project/main` - tmux session for main worktree
-- `my-project/develop` - tmux session for develop worktree
-- `my-project/feature/new-login` - tmux session for feature worktree
-
-### Regular Repository (Also Supported)
-
-```
-~/src/work/
-└── my-project/               # Regular git repository
-    ├── .git/                 # Git data
-    ├── src/
-    └── package.json
-```
-
-Twine works with regular repos too, but you can only work on one branch at a
-time. When you try to work with multiple branches, twine will offer to convert
-it to the bare + worktree pattern.
-
-### Configuration
-
-Tell twine where to look for repositories:
-
-```fish
-set -gx TWINE_BASE_DIRS ~/src/work ~/src/personal ~/projects
-```
-
-Twine will search all these directories for repositories when you run `tw` or `t`.
-
-## Features
-
-- **Interactive selection**: Call `t` or `tw` without arguments for fzf-powered selection
-- **Visual indicators**: Running sessions marked with ▶, available repos with 📁
-- **Multi-directory support**: Search for repositories across multiple base directories
-- **Auto-create worktrees**: Automatically create git worktrees from remote branches
-- **Create new branches**: Create new branches with worktrees using `--create` flag
-- **Smart session management**: Create and switch between tmux sessions for each worktree
-- **Optional tmuxinator integration**: Use custom layouts or fall back to basic tmux sessions
-- **Tab completion**: Intelligent completion prioritizing active sessions over repos
+Twine makes it easy to work on multiple branches simultaneously by pairing git worktrees with dedicated tmux sessions — one session per branch, no context switching.
 
 ## Requirements
 
-**Required:**
-- [Fish shell](https://fishshell.com/) 3.0+
-- [tmux](https://github.com/tmux/tmux) - Terminal multiplexer
-- [git](https://git-scm.com/) - Version control (with worktree support)
-- [fzf](https://github.com/junegunn/fzf) - Fuzzy finder for interactive selection
-- [Fisher](https://github.com/jorgebucaran/fisher) - Fish plugin manager
+- [tmux](https://github.com/tmux/tmux)
+- [git](https://git-scm.com/) (with worktree support, git 2.5+)
 
 **Optional:**
-- [tmuxinator](https://github.com/tmuxinator/tmuxinator) - For custom tmux session layouts
+- [tmuxinator](https://github.com/tmuxinator/tmuxinator) — for custom session layouts
 
 ## Installation
 
-Install via Fisher:
+### Homebrew
+
+```sh
+brew install pean/tap/twine
+```
+
+### From source
+
+```sh
+git clone https://github.com/pean/twine
+cd twine
+make install
+```
+
+### Shell aliases
+
+Twine ships as a single binary. Print the recommended aliases:
+
+```sh
+twine install-aliases
+```
+
+Or write them directly to your fish config:
+
+```sh
+twine install-aliases --write   # appends to ~/.config/fish/config.fish
+```
+
+The aliases are:
 
 ```fish
-fisher install pean/twine
+alias tw='twine worktree'
+alias t='twine session'
+alias tk='twine kill'
+alias ts='twine start'
+alias agents='twine agents'
+```
+
+### Shell completions
+
+Completions for fish, bash, and zsh are in the `completions/` directory.
+
+**Fish:**
+```fish
+cp completions/twine.fish ~/.config/fish/completions/
+```
+
+Or generate fresh ones from the binary:
+```sh
+twine completion fish > ~/.config/fish/completions/twine.fish
+twine completion bash > /etc/bash_completion.d/twine
+twine completion zsh  > "${fpath[1]}/_twine"
 ```
 
 ## Configuration
 
-### Required
+Twine reads `~/.config/twine/config.toml`. Create it with:
 
-Add to `~/.config/fish/config.fish`:
-
-```fish
-# Base directories to search for repositories
-set -gx TWINE_BASE_DIRS ~/src/work ~/src/personal ~/projects
+```sh
+twine config init
 ```
 
-### Optional
+That writes a starter file you can edit:
 
-```fish
-# Tmuxinator layout to use (if tmuxinator is installed)
-set -gx TWINE_TMUXINATOR_LAYOUT dev
+```toml
+# ~/.config/twine/config.toml
 
-# Session name prefix (e.g., "work-" for "work-repo/branch")
-set -gx TWINE_SESSION_PREFIX ""
+# Directories to search for repositories (required).
+base_dirs = [
+  "~/src/work",
+  "~/src/personal",
+]
 
-# Control tmuxinator usage: auto (default), true, or false
-set -gx TWINE_USE_TMUXINATOR auto
+# Prefix prepended to all tmux session names (optional).
+# session_prefix = ""
+
+# Tmuxinator integration (optional).
+# use_tmuxinator = "auto"  # auto | true | false
+# tmuxinator_layout = "dev"
 ```
 
-**Tmuxinator behavior:**
-- `auto` (default): Use tmuxinator if installed and `TWINE_TMUXINATOR_LAYOUT` is set
-- `true`: Always use tmuxinator (error if not installed)
-- `false`: Never use tmuxinator, create basic tmux sessions
+`use_tmuxinator = "auto"` (the default) uses tmuxinator when it is installed
+and `tmuxinator_layout` is set.
 
-## Command Reference
+## Commands
 
-### Quick Reference
+### `twine worktree` (`tw`)
 
-```fish
-tw [repo] [branch] [options]  # Work on a specific branch (main command)
-  -c, --create                # Create new branch if it doesn't exist
-  -f, --from BRANCH           # Base branch for new branch
-t [repo]                      # Switch to a project (no branch selection)
-ts                            # Launch tmuxinator in current repo
-agents                        # List and switch to AI coding agents (Claude Code & OpenCode)
-tk [--worktree|-w] [session] # Kill tmux sessions with optional worktree removal
-twine init <name> <url> [branch]  # Set up new repo
-twine convert <repo>          # Convert existing repo to worktrees
+The main command. Creates worktrees and switches to their tmux sessions.
+
+```sh
+tw                              # interactive repo + branch selection
+tw my-project                   # interactive branch selection
+tw my-project main              # switch to main (creates worktree if needed)
+tw my-project feature/x         # check out from remote
+tw my-project feature/x -c      # create new branch from main/master
+tw my-project feature/x -c -f develop  # create from develop
 ```
 
-**Getting help:**
-```fish
-twine --help              # Overview of all actions
-tw --help                 # Help for worktree command
+When the repository is not found, you are prompted for a git URL or
+`org/repo` shorthand (uses `gh repo clone`), and it is cloned as bare
+automatically.
+
+When a regular (non-bare) repo is found, you are offered to convert it to the
+bare + worktree layout.
+
+Flags: `-c / --create`, `-f / --from <branch>`
+
+### `twine session` (`t`)
+
+Faster session switcher — no branch selection, just finds the repo session and attaches.
+
+```sh
+t my-project
 ```
 
-### `tw` (worktree)
+### `twine kill` (`tk`)
 
-Branch-focused workflow - creates worktrees and switches to branch-specific sessions.
+Kill tmux sessions, optionally removing their worktrees.
 
-```fish
-tw [repo] [branch] [options]
-twine worktree [repo] [branch] [options]  # Verbose form
+```sh
+tk                              # interactive multi-select, prompts for worktree removal
+tk my-project/feature/x         # kill specific session
+tk my-project/feature/x -w      # also remove the worktree without prompting
 ```
 
-**Options:**
-- `-c, --create` - Create new branch if it doesn't exist
-- `-f, --from BRANCH` - Base branch for new branch (default: main/master)
+### `twine prune`
 
-**Examples:**
-```fish
-tw my-project feature/login              # Switch to existing branch
-tw my-project feature/new -c             # Create new branch from main/master
-tw my-project feature/new -c -f develop  # Create new branch from develop
+Remove branches whose remote has been deleted: kills sessions, removes worktrees, deletes local branches, and runs `git worktree prune` to clean up stale refs.
+
+```sh
+twine prune                     # all repos
+twine prune my-project          # specific repo
+twine prune --dry-run           # preview
 ```
 
-**Features:**
-- Without args: Interactive fzf selection of all repos and branches
-- With repo only: Interactive branch selection for that repo
-- With repo and branch: Direct switch (creates worktree if needed)
-- Fetches latest remote branches before selection
-- Auto-creates worktrees from remote branches
-- Creates new branches with `--create` flag
-- Auto-detects default branch (main/master) or use `--from` to specify
-- Visual indicators: ▶ for active, 📁 for available
+### `twine agents`
 
-### `t` (session)
+Dashboard for AI coding agents running in tmux sessions. Detects Claude Code and OpenCode, shows their state, and lets you switch to them.
 
-Project-focused workflow - switches to main repo session without branch selection.
-
-```fish
-t [repo]
-twine session [repo]  # Verbose form
+```sh
+twine agents
 ```
 
-- Without args: Interactive fzf selection of all repos
-- With repo: Direct switch to that project
-- Faster than `tw` when you don't need branch selection
-- Creates session if repo exists but session doesn't
-- Prioritizes running sessions in completions
+Bind it to a tmux key for quick access:
 
-### `ts` (start)
-
-Launches tmuxinator with your configured layout in the current directory.
-
-```fish
-ts [args]
-twine start [args]  # Verbose form
-```
-
-- Must be run from within a git repository
-- Requires tmuxinator installation
-- Uses layout specified in `TWINE_TMUXINATOR_LAYOUT`
-
-### `init`
-
-Sets up a new repository with bare + worktree structure from a remote URL.
-
-```fish
-twine init <repo-name> <git-url> [branch]
-```
-
-Steps performed:
-1. Clones repository as bare (`repo-name.git`)
-2. Creates worktree for initial branch (default or specified)
-3. Repository is ready to use with `tw`
-
-### `convert`
-
-Converts an existing regular repository to bare + worktree structure.
-
-```fish
-twine convert <repo>
-```
-
-Steps performed:
-1. Clones regular repo as bare (`repo.git`)
-2. Creates worktree for current branch
-3. Optionally removes old regular repo directory
-
-The `tw` command will also offer to convert when it detects a regular repo.
-
-### `attach`
-
-Low-level tmux session attach/switch (rarely needed directly).
-
-```fish
-twine attach <session-name>
-```
-
-Used internally by `tw` and `t`. Use those commands instead for better
-integration with git worktrees.
-
-### `agents`
-
-AI agent dashboard - lists and switches between AI coding agents (Claude Code & OpenCode) running in tmux sessions.
-
-```fish
-agents
-twine agents  # Verbose form
-```
-
-**Features:**
-- Detects Claude Code agents via `~/.claude/sessions/` metadata
-- Detects OpenCode agents via process detection in tmux panes
-- Shows session name, directory, model (for Claude Code), and **real-time state**
-- Interactive fzf selection with visual indicators:
-  - 🤖 Claude Code sessions
-  - 🔓 OpenCode sessions
-- **Agent states** (with color coding):
-  - ⚡Working (yellow) - actively processing or running tools
-  - ❗Input (magenta) - **awaiting user approval** (highlighted!)
-  - ⏸ Idle (green) - ready for new prompts
-  - 🆕 New (cyan) - no interaction yet
-- Works from any tmux session or outside tmux
-
-**Tmux popup keybinding:**
-
-Add to your `~/.tmux.conf`:
 ```tmux
-bind-key a display-popup -E -w 90% -h 90% "agents"
+bind-key a display-popup -E -w 90% -h 90% "twine agents"
 ```
 
-Then press `prefix + a` to open the agents dashboard in a popup.
+## How it works
 
-**Workflow example:**
-```fish
-# Set up worktrees for different branches
-tw myproject main
-tw myproject feature/api
+### Repository layout
 
-# Start different AI agents in each session
-tmux switch-client -t myproject/main
-claude-code  # Start Claude Code here
+Twine works best with the bare + worktree pattern:
 
-tmux switch-client -t myproject/feature/api
-opencode     # Start OpenCode here
-
-# View all agents and switch between them
-agents
-# Or: prefix + a (with tmux keybinding)
+```
+~/src/work/
+└── my-project.git/     ← bare repository
+    ├── main/           ← worktree for main
+    ├── develop/        ← worktree for develop
+    └── feature/xyz/    ← worktree for feature/xyz
 ```
 
+Each worktree is a full working directory sharing the same git objects. You can have all branches checked out at once with no switching overhead.
 
-### `kill` / `tk`
+### Session naming
 
-Kill tmux sessions, with optional git worktree removal.
+Sessions are named `<prefix><repo>/<branch>`:
 
-```fish
-tk [--worktree|-w] [session-name...]
-twine kill [--worktree|-w] [session-name...]
+```
+my-project/main
+my-project/feature/xyz
 ```
 
-**Options:**
-- `-w, --worktree` - Also remove the git worktree for each killed session
+### Worktree creation
 
-**Examples:**
-```fish
-tk                              # Interactive multi-select of all sessions
-tk my-project/main              # Kill a specific session directly
-tk my-project/main -w           # Kill session and remove its worktree
-tk my-project/main my-project/feature -w  # Kill multiple + remove worktrees
-```
+When you ask for a branch that has no local worktree yet, twine handles three cases:
 
-**Tmux popup keybinding:**
-
-Add to your `~/.tmux.conf`:
-```tmux
-bind-key k display-popup -E -w 90% -h 90% "tk"
-```
-
-Then press `prefix + k` to open the kill dashboard in a popup.
-
-## Tmuxinator Setup (Optional)
-
-If you want to use custom tmux layouts, install tmuxinator and create a layout file:
-
-1. Install tmuxinator:
-   ```bash
-   gem install tmuxinator
-   ```
-
-2. Create a layout (e.g., `~/.config/tmuxinator/dev.yml`):
-   ```yaml
-   name: <%= ENV["TMUX_SESSION_NAME"] || "dev" %>
-   root: <%= ENV["PWD"] %>
-
-   windows:
-     - editor:
-         layout: main-vertical
-         panes:
-           - nvim
-           -
-     - terminal:
-   ```
-
-3. Configure twine to use it:
-   ```fish
-   set -gx TWINE_TMUXINATOR_LAYOUT dev
-   ```
-
-See `templates/dev.yml.example` for a full example.
-
-## Tips & Workflow Suggestions
-
-- **Start interactive**: Call `t` or `tw` without arguments to see all options with visual indicators
-- **Use tab completion**: Running sessions appear first (▶), then available repos (📁)
-- **Choose the right command**: Use `tw` when working with branches, `t` for quick project navigation
-- **Let it auto-create**: When you `tw repo branch`, worktrees are created automatically if needed
-- **Multiple base dirs**: Configure `TWINE_BASE_DIRS` to search across work/personal/hobby projects
-- **Convert when ready**: Regular repos work fine, but `convert` unlocks parallel branch workflows
+1. **Branch exists on remote and locally** — adds worktree and sets upstream tracking
+2. **Branch exists on remote only** — creates a new tracking branch and worktree
+3. **Branch doesn't exist anywhere + `--create`** — creates a new branch from main/master (or `--from`)
 
 ## Development
 
-### Running Tests
-
-Twine includes a comprehensive test suite using [Fishtape](https://github.com/jorgebucaran/fishtape).
-
-**Install Fishtape:**
-```fish
-fisher install jorgebucaran/fishtape
+```sh
+make build       # build to bin/twine
+make test        # go test ./...
+make install     # go install ./cmd/twine
+make completions # regenerate completion files
 ```
-
-**Run tests:**
-```fish
-./test
-```
-
-**Test coverage includes:**
-- Configuration validation
-- Repository finding across multiple directories
-- Worktree detection and creation logic
-- Session management
-- Tmuxinator integration
-- Tab completions
-
-Tests run automatically on GitHub Actions for every push and pull request.
-
-### Contributing
-
-Contributions welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure all tests pass
-5. Submit a pull request
-
-**Commit Message Format:**
-
-This project uses [Conventional Commits](https://www.conventionalcommits.org/):
-
-```
-<type>: <description>
-
-[optional body]
-```
-
-Types:
-- `feat:` - New feature (bumps MINOR version)
-- `fix:` - Bug fix (bumps PATCH version)
-- `docs:` - Documentation changes
-- `test:` - Test changes
-- `chore:` - Maintenance tasks
-- `refactor:` - Code refactoring
-- `BREAKING CHANGE:` - Breaking changes (bumps MAJOR version)
-
-Examples:
-```bash
-git commit -m "feat: add interactive branch selection"
-git commit -m "fix: resolve session switching issue"
-git commit -m "docs: update installation instructions"
-```
-
-### Releases
-
-Releases are managed automatically using [release-please](https://github.com/googleapis/release-please).
-
-**CHANGELOG:** Maintained automatically based on conventional commits.
-
-**Creating a release:**
-
-1. Ensure all changes are committed and pushed to master
-2. Trigger the release workflow:
-   ```bash
-   gh workflow run release-please.yml
-   ```
-3. Review and merge the automated Release PR
-4. Git tag and GitHub release are created automatically
-
-**Version scheme:** [Semantic Versioning](https://semver.org/) (MAJOR.MINOR.PATCH)
-
-## Uninstall
-
-```fish
-fisher remove pean/twine
-```
-
-Remove configuration from `~/.config/fish/config.fish`.
 
 ## License
 
