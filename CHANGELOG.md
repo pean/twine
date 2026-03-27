@@ -11,8 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `twine session .` / `ts .` creates a tmux session rooted at the current
   directory (or any absolute path), named after the directory basename
-- `ts` alias for `twine session` (replaces `t`); removes legacy `ts.fish`
-  tmuxinator launcher
+- `ts` alias for `twine session` (replaces `t`)
+
+### Removed
+
+- All Fish shell functions (`functions/`) and Fish tests (`tests/`) — the Go
+  binary fully replaces the former Fisher plugin
 
 ## [2.0.0] - 2026-03-27
 
