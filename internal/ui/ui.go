@@ -111,13 +111,15 @@ func (m selectModel) View() string {
 	}
 	for i := start; i < end; i++ {
 		item := m.filtered[i]
-		indicator := "  📁 "
+		indicator := "📁 "
 		if item.Active {
-			indicator = activeStyle.Render("  ▶  ")
+			indicator = activeStyle.Render("▶  ")
 		}
-		line := indicator + item.Title
+		var line string
 		if i == m.cursor {
-			line = selectedStyle.Render("> " + indicator[2:] + item.Title)
+			line = selectedStyle.Render(">") + " " + indicator + item.Title
+		} else {
+			line = "  " + indicator + item.Title
 		}
 		sb.WriteString(line + "\n")
 	}
@@ -239,15 +241,15 @@ func (m multiModel) View() string {
 		if isSelected {
 			check = "[x]"
 		}
-		indicator := "  📁 "
+		indicator := "📁 "
 		if item.Active {
-			indicator = activeStyle.Render("  ▶  ")
+			indicator = activeStyle.Render("▶  ")
 		}
 		var line string
 		if i == m.cursor {
-			line = selectedStyle.Render("> "+check) + fmt.Sprintf(" %s%s", indicator, item.Title)
+			line = selectedStyle.Render("> "+check) + " " + indicator + item.Title
 		} else {
-			line = fmt.Sprintf("  %s %s%s", check, indicator, item.Title)
+			line = "  " + check + " " + indicator + item.Title
 		}
 		sb.WriteString(line + "\n")
 	}

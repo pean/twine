@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Multi-select UI showed `> ] title` for the cursor row due to an off-by-two
   byte slice; now correctly renders `> [ ] title` / `> [x] title`
+- Single-select cursor row leaked raw ANSI codes (e.g. `32m`) from styled
+  indicator strings; fixed by keeping leading spaces outside ANSI styling
 
 ### Removed
 
