@@ -243,9 +243,11 @@ func (m multiModel) View() string {
 		if item.Active {
 			indicator = activeStyle.Render("  ▶  ")
 		}
-		line := fmt.Sprintf("%s %s%s", check, indicator, item.Title)
+		var line string
 		if i == m.cursor {
-			line = selectedStyle.Render("> " + line[2:])
+			line = selectedStyle.Render("> "+check) + fmt.Sprintf(" %s%s", indicator, item.Title)
+		} else {
+			line = fmt.Sprintf("  %s %s%s", check, indicator, item.Title)
 		}
 		sb.WriteString(line + "\n")
 	}

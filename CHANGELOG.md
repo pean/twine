@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   respects tmuxinator config when enabled
 - `ts` alias for `twine session` (replaces `t`)
 
+### Fixed
+
+- Multi-select UI showed `> ] title` for the cursor row due to an off-by-two
+  byte slice; now correctly renders `> [ ] title` / `> [x] title`
+
 ### Removed
 
 - All Fish shell functions (`functions/`) and Fish tests (`tests/`) — the Go
