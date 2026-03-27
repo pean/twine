@@ -11,27 +11,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Fish shell
-        run: |
-          sudo apt-add-repository ppa:fish-shell/release-3
-          sudo apt-get update
-          sudo apt-get install -y fish
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
 
-      - name: Install Fisher
-        run: |
-          fish -c "curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source && fisher install jorgebucaran/fisher"
+      - name: Build
+        run: go build ./...
 
-      - name: Install Fishtape
-        run: |
-          fish -c "fisher install jorgebucaran/fishtape"
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get install -y git tmux
-
-      - name: Run tests
-        run: |
-          fish ./test
+      - name: Test
+        run: go test ./...
