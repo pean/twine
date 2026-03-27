@@ -34,11 +34,13 @@ Twine makes it easy to work on multiple branches simultaneously by pairing git w
 
 ## Installation
 
-### Homebrew
+### Go install
 
 ```sh
-brew install pean/tap/twine
+go install github.com/pean/twine/cmd/twine@latest
 ```
+
+Make sure `~/go/bin` is in your `PATH` (e.g. add `fish_add_path ~/go/bin` to `~/.config/fish/config.fish`).
 
 ### From source
 
