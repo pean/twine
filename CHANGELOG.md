@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0](https://github.com/pean/twine/compare/v1.0.0...v2.0.0) (2026-03-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* rewrite as standalone Go CLI binary
+
+### Features
+
+* rewrite as standalone Go CLI binary ([a5202b6](https://github.com/pean/twine/commit/a5202b6847172246b94b1e71144078aad7082e90))
+* rewrite as standalone Go CLI binary ([#1](https://github.com/pean/twine/issues/1)) ([e4bd636](https://github.com/pean/twine/commit/e4bd636e6134e979d7a7b5cd6c86c92f0962d2cb))
+
 ## [Unreleased]
 
 ### Added
