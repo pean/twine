@@ -11,12 +11,10 @@ function twine --description 'Git worktree + tmux session management'
     switch $action
         case worktree tw
             tw $argv[2..]
-        case session t
-            t $argv[2..]
+        case session ts
+            ts $argv[2..]
         case attach
             __twine_attach $argv[2..]
-        case start ts
-            ts $argv[2..]
         case init
             __twine_init $argv[2..]
         case convert
@@ -42,8 +40,8 @@ function __twine_help --description 'Show twine help'
     echo ""
     echo "Actions:"
     echo "  worktree    Manage worktrees and sessions (shortcut: tw)"
-    echo "  session     Switch to repo session (shortcut: t)"
-    echo "  start       Start tmuxinator for repo (shortcut: ts)"
+    echo "  session     Switch to repo session (shortcut: ts)"
+    echo "  start       Start tmuxinator for repo"
     echo "  attach      Attach to tmux session"
     echo "  init        Initialize new bare repo"
     echo "  convert     Convert regular repo to bare"
@@ -53,8 +51,7 @@ function __twine_help --description 'Show twine help'
     echo ""
     echo "Shortcuts:"
     echo "  tw          Same as 'twine worktree'"
-    echo "  t           Same as 'twine session'"
-    echo "  ts          Same as 'twine start'"
+    echo "  ts          Same as 'twine session'"
     echo ""
     echo "Examples:"
     echo "  twine worktree my-project        # Interactive worktree selection"
@@ -69,7 +66,7 @@ function __twine_help --description 'Show twine help'
     echo "  twine kill my-proj/main -w       # Kill session and remove worktree"
     echo ""
     echo "  tw my-project                    # Shortcut for 'twine worktree'"
-    echo "  t my-project                     # Shortcut for 'twine session'"
+    echo "  ts my-project                    # Shortcut for 'twine session'"
     echo ""
     echo "Help:"
     echo "  twine --help              # This message"

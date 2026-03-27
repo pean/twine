@@ -37,13 +37,13 @@ set output (twine worktree my-repo 2>&1)
 set output (twine tw my-repo feature/branch 2>&1)
 @test "twine routes tw shortcut to tw function" (string match -q "*tw called with: my-repo feature/branch*" -- $output) $status -eq 0
 
-# Test: twine routes session action to t
+# Test: twine routes session action to ts
 set output (twine session my-repo 2>&1)
-@test "twine routes session action to t" (string match -q "*t called with: my-repo*" -- $output) $status -eq 0
+@test "twine routes session action to ts" (string match -q "*ts called with: my-repo*" -- $output) $status -eq 0
 
-# Test: twine routes t shortcut to t function
-set output (twine t my-session 2>&1)
-@test "twine routes t shortcut to t function" (string match -q "*t called with: my-session*" -- $output) $status -eq 0
+# Test: twine routes ts shortcut to ts function
+set output (twine ts my-session 2>&1)
+@test "twine routes ts shortcut to ts function" (string match -q "*ts called with: my-session*" -- $output) $status -eq 0
 
 # Test: twine routes attach action to __twine_attach
 set output (twine attach my-session 2>&1)

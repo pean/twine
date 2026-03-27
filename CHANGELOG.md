@@ -9,8 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `twine session .` / `t .` creates a tmux session rooted at the current
+- `twine session .` / `ts .` creates a tmux session rooted at the current
   directory (or any absolute path), named after the directory basename
+- `ts` alias for `twine session` (replaces `t`); removes legacy `ts.fish`
+  tmuxinator launcher
 
 ## [2.0.0] - 2026-03-27
 

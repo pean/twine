@@ -19,7 +19,7 @@ import (
 
 var sessionCmd = &cobra.Command{
 	Use:     "session [repo-or-session]",
-	Aliases: []string{"t"},
+	Aliases: []string{"ts"},
 	Short:   "Switch to a tmux session (faster, no branch selection)",
 	Long: `Switch to an existing tmux session or create one for a repo.
 

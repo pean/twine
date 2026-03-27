@@ -16,7 +16,7 @@ import (
 
 const aliasBlock = `# Twine aliases
 alias tw='twine worktree'
-alias t='twine session'
+alias ts='twine session'
 alias tk='twine kill'`
 
 var installCmd = &cobra.Command{
@@ -34,7 +34,7 @@ func runInstall(_ *cobra.Command, _ []string) error {
 
 	items := []ui.Item{
 		{Title: "Config   (~/.config/twine/config.toml)", Value: "config"},
-		{Title: "Aliases  (tw, t, tk)", Value: "aliases"},
+		{Title: "Aliases  (tw, ts, tk)", Value: "aliases"},
 		{Title: "Completions  (" + shell + ")", Value: "completions"},
 	}
 	chosen, err := ui.MultiSelect(items, "Select what to install:")
