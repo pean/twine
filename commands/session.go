@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 
 	"github.com/spf13/cobra"
 
@@ -105,8 +106,15 @@ func runSession(cmd *cobra.Command, args []string) error {
 }
 
 func selectSession(cfg *config.Config) (string, error) {
-	sessions, _ := tmux.ListSessions()
-	allRepos, _ := repo.FindAll(cfg.BaseDirs)
+	var (
+		sessions []string
+		allRepos []*repo.Repo
+		wg       sync.WaitGroup
+	)
+	wg.Add(2)
+	go func() { defer wg.Done(); sessions, _ = tmux.ListSessions() }()
+	go func() { defer wg.Done(); allRepos, _ = repo.FindAll(cfg.BaseDirs) }()
+	wg.Wait()
 
 	sessionSet := map[string]bool{}
 	var items []ui.Item

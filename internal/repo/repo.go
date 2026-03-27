@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/pean/twine/internal/git"
 )
@@ -33,37 +34,59 @@ func Find(baseDirs []string, name string) (*Repo, error) {
 }
 
 // FindAll returns all repos in baseDirs.
+// Entries are checked in parallel using stat calls rather than git subprocesses.
 func FindAll(baseDirs []string) ([]*Repo, error) {
+	var mu sync.Mutex
 	var repos []*Repo
 	seen := map[string]bool{}
+
 	for _, base := range baseDirs {
 		entries, err := os.ReadDir(base)
 		if err != nil {
 			continue
 		}
+
+		var wg sync.WaitGroup
 		for _, e := range entries {
 			if !e.IsDir() {
 				continue
 			}
 			fullPath := filepath.Join(base, e.Name())
+			mu.Lock()
 			if seen[fullPath] {
+				mu.Unlock()
 				continue
 			}
 			seen[fullPath] = true
-			bare := strings.HasSuffix(e.Name(), ".git") && git.IsBareRepo(fullPath)
-			if bare {
-				name := strings.TrimSuffix(e.Name(), ".git")
-				repos = append(repos, &Repo{
-					Path: fullPath, Name: name, IsBare: true,
-				})
-				continue
-			}
-			if git.IsGitRepo(fullPath) {
-				repos = append(repos, &Repo{
-					Path: fullPath, Name: e.Name(), IsBare: false,
-				})
-			}
+			mu.Unlock()
+
+			wg.Add(1)
+			go func(name, path string) {
+				defer wg.Done()
+				var r *Repo
+				if strings.HasSuffix(name, ".git") {
+					// Bare repos have a HEAD file at their root.
+					if _, err := os.Stat(filepath.Join(path, "HEAD")); err == nil {
+						r = &Repo{
+							Path:   path,
+							Name:   strings.TrimSuffix(name, ".git"),
+							IsBare: true,
+						}
+					}
+				} else {
+					// Regular repos have a .git entry at their root.
+					if _, err := os.Stat(filepath.Join(path, ".git")); err == nil {
+						r = &Repo{Path: path, Name: name, IsBare: false}
+					}
+				}
+				if r != nil {
+					mu.Lock()
+					repos = append(repos, r)
+					mu.Unlock()
+				}
+			}(e.Name(), fullPath)
 		}
+		wg.Wait()
 	}
 	return repos, nil
 }

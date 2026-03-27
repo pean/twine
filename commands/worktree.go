@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/spf13/cobra"
 
@@ -20,6 +21,7 @@ import (
 var (
 	worktreeCreate   bool
 	worktreeFromBase string
+	worktreeRemote   bool
 )
 
 var worktreeCmd = &cobra.Command{
@@ -42,6 +44,10 @@ func init() {
 	worktreeCmd.Flags().StringVarP(
 		&worktreeFromBase, "from", "f", "",
 		"base branch for new branch (default: main/master)",
+	)
+	worktreeCmd.Flags().BoolVarP(
+		&worktreeRemote, "remote", "r", false,
+		"fetch and show remote branches instead of local",
 	)
 }
 
@@ -107,7 +113,7 @@ func runWorktree(cmd *cobra.Command, args []string) error {
 
 	// ---- branch selection ----
 	if branch == "" {
-		b, err := selectBranch(r, repoName)
+		b, err := selectBranch(r, repoName, worktreeRemote)
 		if err != nil {
 			return err
 		}
@@ -228,7 +234,16 @@ func convertToBare(repoPath string) error {
 
 // selectRepo presents an interactive list of repos + active sessions.
 func selectRepo(cfg *config.Config) (string, error) {
-	sessions, _ := tmux.ListSessions()
+	var (
+		sessions []string
+		allRepos []*repo.Repo
+		wg       sync.WaitGroup
+	)
+	wg.Add(2)
+	go func() { defer wg.Done(); sessions, _ = tmux.ListSessions() }()
+	go func() { defer wg.Done(); allRepos, _ = repo.FindAll(cfg.BaseDirs) }()
+	wg.Wait()
+
 	sessionRepos := map[string]bool{}
 	for _, s := range sessions {
 		if idx := strings.Index(s, "/"); idx >= 0 {
@@ -240,7 +255,6 @@ func selectRepo(cfg *config.Config) (string, error) {
 	for name := range sessionRepos {
 		items = append(items, ui.Item{Title: name, Value: name, Active: true})
 	}
-	allRepos, _ := repo.FindAll(cfg.BaseDirs)
 	for _, r := range allRepos {
 		if !sessionRepos[r.Name] {
 			items = append(items, ui.Item{Title: r.Name, Value: r.Name})
@@ -254,43 +268,45 @@ func selectRepo(cfg *config.Config) (string, error) {
 	return chosen.Value, err
 }
 
-// selectBranch fetches remote branches and presents an interactive list.
-func selectBranch(r *repo.Repo, repoName string) (string, error) {
-	var fetchErr error
-	_ = ui.Spinner("Fetching branches…", func() error {
-		fetchErr = r.Fetch()
-		return nil
-	})
-	if fetchErr != nil {
-		fmt.Fprintf(os.Stderr, "Warning: fetch failed: %v\n", fetchErr)
-	}
-
-	worktrees, _ := r.ListWorktrees()
-	wtSet := map[string]bool{}
-	for _, wt := range worktrees {
-		wtSet[wt] = true
-	}
-	locals, _ := r.ListLocalBranches()
-	remotes, _ := r.ListRemoteBranches()
-
-	seen := map[string]bool{}
+// selectBranch presents an interactive branch list.
+// Without remote: shows worktrees + local branches (no network call).
+// With remote: fetches and shows remote branches only.
+func selectBranch(r *repo.Repo, repoName string, remote bool) (string, error) {
 	var items []ui.Item
-	for _, wt := range worktrees {
-		if !seen[wt] {
-			items = append(items, ui.Item{Title: wt, Value: wt, Active: true})
-			seen[wt] = true
+
+	if remote {
+		var fetchErr error
+		_ = ui.Spinner("Fetching branches…", func() error {
+			fetchErr = r.Fetch()
+			return nil
+		})
+		if fetchErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: fetch failed: %v\n", fetchErr)
 		}
-	}
-	for _, b := range locals {
-		if !seen[b] {
-			items = append(items, ui.Item{Title: b, Value: b, Active: wtSet[b]})
-			seen[b] = true
-		}
-	}
-	for _, b := range remotes {
-		if !seen[b] {
+		branches, _ := r.ListRemoteBranches()
+		for _, b := range branches {
 			items = append(items, ui.Item{Title: b, Value: b})
-			seen[b] = true
+		}
+	} else {
+		worktrees, _ := r.ListWorktrees()
+		wtSet := map[string]bool{}
+		for _, wt := range worktrees {
+			wtSet[wt] = true
+		}
+		locals, _ := r.ListLocalBranches()
+
+		seen := map[string]bool{}
+		for _, wt := range worktrees {
+			if !seen[wt] {
+				items = append(items, ui.Item{Title: wt, Value: wt, Active: true})
+				seen[wt] = true
+			}
+		}
+		for _, b := range locals {
+			if !seen[b] {
+				items = append(items, ui.Item{Title: b, Value: b, Active: wtSet[b]})
+				seen[b] = true
+			}
 		}
 	}
 
