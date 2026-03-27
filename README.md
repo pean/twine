@@ -190,6 +190,31 @@ make install     # go install ./cmd/twine
 make completions # regenerate completion files
 ```
 
+## Release
+
+Releases are automated via [release-please](https://github.com/googleapis/release-please).
+The version is derived from conventional commit messages:
+`feat:` → minor, `fix:` → patch, `BREAKING CHANGE` footer → major.
+
+**To cut a release:**
+
+1. Ensure all changes are on `master` with conventional commit messages.
+   For a major version bump, add an empty breaking-change commit:
+   ```sh
+   git commit --allow-empty -m "feat!: <summary>
+
+   BREAKING CHANGE: <description of what broke>"
+   ```
+
+2. Trigger the workflow:
+   ```sh
+   gh workflow run release-please.yml
+   ```
+
+3. release-please opens a PR with updated `CHANGELOG.md` and version bump.
+   Merge it — that creates the git tag and GitHub release, and triggers
+   cross-compiled binary uploads for linux/darwin × amd64/arm64.
+
 ## License
 
 MIT
