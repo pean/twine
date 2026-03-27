@@ -66,9 +66,17 @@ func runSession(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("cannot resolve path: %w", err)
 		}
 		name := cfg.SessionPrefix + strings.TrimLeft(filepath.Base(dir), ".")
-		if err := tmux.NewSession(name, dir); err != nil &&
-			!strings.Contains(err.Error(), "duplicate session") {
-			return fmt.Errorf("failed to create session: %w", err)
+		if !tmux.HasSession(name) {
+			if cfg.ShouldUseTmuxinator() {
+				if err := runTmuxinator(name, dir, cfg); err != nil {
+					return err
+				}
+			} else {
+				if err := tmux.NewSession(name, dir); err != nil &&
+					!strings.Contains(err.Error(), "duplicate session") {
+					return fmt.Errorf("failed to create session: %w", err)
+				}
+			}
 		}
 		return tmux.AttachOrSwitch(name)
 	}

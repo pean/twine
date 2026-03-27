@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `twine session .` / `ts .` creates a tmux session rooted at the current
-  directory (or any absolute path), named after the directory basename
+  directory (or any absolute path), named after the directory basename;
+  respects tmuxinator config when enabled
 - `ts` alias for `twine session` (replaces `t`)
 
 ### Removed
