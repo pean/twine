@@ -2,6 +2,27 @@
 
 > Git worktree + tmux session management
 
+```
+Twine manages git worktrees and tmux sessions together.
+
+Usage:
+  twine [command]
+
+Available Commands:
+  agents      List and switch to AI coding agents in tmux
+  config      Manage twine configuration
+  install     Set up shell aliases and completions
+  kill        Kill tmux sessions with optional worktree removal
+  prune       Clean up gone branches, worktrees, and sessions
+  session     Switch to a tmux session (faster, no branch selection)
+  worktree    Create worktree and switch tmux session
+
+Flags:
+  -h, --help   help for twine
+
+Use "twine [command] --help" for more information about a command.
+```
+
 Twine makes it easy to work on multiple branches simultaneously by pairing git worktrees with dedicated tmux sessions — one session per branch, no context switching.
 
 ## Requirements
@@ -28,44 +49,12 @@ cd twine
 make install
 ```
 
-### Shell aliases
+### Shell setup
 
-Twine ships as a single binary. Print the recommended aliases:
-
-```sh
-twine install-aliases
-```
-
-Or write them directly to your fish config:
+Run the interactive installer to set up aliases and completions for your shell (fish, bash, or zsh):
 
 ```sh
-twine install-aliases --write   # appends to ~/.config/fish/config.fish
-```
-
-The aliases are:
-
-```fish
-alias tw='twine worktree'
-alias t='twine session'
-alias tk='twine kill'
-alias ts='twine start'
-alias agents='twine agents'
-```
-
-### Shell completions
-
-Completions for fish, bash, and zsh are in the `completions/` directory.
-
-**Fish:**
-```fish
-cp completions/twine.fish ~/.config/fish/completions/
-```
-
-Or generate fresh ones from the binary:
-```sh
-twine completion fish > ~/.config/fish/completions/twine.fish
-twine completion bash > /etc/bash_completion.d/twine
-twine completion zsh  > "${fpath[1]}/_twine"
+twine install
 ```
 
 ## Configuration
@@ -158,7 +147,7 @@ Dashboard for AI coding agents running in tmux sessions. Detects Claude Code and
 twine agents
 ```
 
-Bind it to a tmux key for quick access:
+Bind it to a tmux key for quick access — add to `~/.tmux.conf`:
 
 ```tmux
 bind-key a display-popup -E -w 90% -h 90% "twine agents"

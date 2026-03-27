@@ -10,6 +10,9 @@ var rootCmd = &cobra.Command{
 	Use:   "twine",
 	Short: "Git worktree + tmux session management",
 	Long:  `Twine manages git worktrees and tmux sessions together.`,
+	CompletionOptions: cobra.CompletionOptions{
+		DisableDefaultCmd: true,
+	},
 }
 
 // Execute runs the root command.
@@ -26,5 +29,5 @@ func init() {
 	rootCmd.AddCommand(agentsCmd)
 	rootCmd.AddCommand(killCmd)
 	rootCmd.AddCommand(configCmd)
-	rootCmd.AddCommand(installAliasesCmd)
+	rootCmd.AddCommand(installCmd)
 }
