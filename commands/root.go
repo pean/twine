@@ -28,6 +28,5 @@ func init() {
 	rootCmd.AddCommand(pruneCmd)
 	rootCmd.AddCommand(agentsCmd)
 	rootCmd.AddCommand(killCmd)
-	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(installCmd)
 }

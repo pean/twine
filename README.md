@@ -10,8 +10,7 @@ Usage:
 
 Available Commands:
   agents      List and switch to AI coding agents in tmux
-  config      Manage twine configuration
-  install     Set up shell aliases and completions
+  install     Set up config, aliases, and completions
   kill        Kill tmux sessions with optional worktree removal
   prune       Clean up gone branches, worktrees, and sessions
   session     Switch to a tmux session (faster, no branch selection)
@@ -59,13 +58,7 @@ twine install
 
 ## Configuration
 
-Twine reads `~/.config/twine/config.toml`. Create it with:
-
-```sh
-twine config init
-```
-
-That writes a starter file you can edit:
+Twine reads `~/.config/twine/config.toml`. The `twine install` command will create it for you, or write it manually:
 
 ```toml
 # ~/.config/twine/config.toml

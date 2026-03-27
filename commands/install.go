@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/pean/twine/internal/config"
 	"github.com/pean/twine/internal/ui"
 )
 
@@ -20,8 +21,8 @@ alias tk='twine kill'`
 
 var installCmd = &cobra.Command{
 	Use:   "install",
-	Short: "Set up shell aliases and completions",
-	Long: `Interactively install shell aliases and tab completions.
+	Short: "Set up config, aliases, and completions",
+	Long: `Interactively set up Twine: config file, shell aliases, and tab completions.
 
 Shell is detected from $SHELL. Aliases are appended to your shell config
 file; completions are written to the appropriate completions directory.`,
@@ -32,6 +33,7 @@ func runInstall(_ *cobra.Command, _ []string) error {
 	shell := detectShell()
 
 	items := []ui.Item{
+		{Title: "Config   (~/.config/twine/config.toml)", Value: "config"},
 		{Title: "Aliases  (tw, t, tk)", Value: "aliases"},
 		{Title: "Completions  (" + shell + ")", Value: "completions"},
 	}
@@ -46,6 +48,10 @@ func runInstall(_ *cobra.Command, _ []string) error {
 
 	for _, item := range chosen {
 		switch item.Value {
+		case "config":
+			if err := installConfig(); err != nil {
+				return err
+			}
 		case "aliases":
 			if err := installAliases(shell); err != nil {
 				return err
@@ -56,6 +62,29 @@ func runInstall(_ *cobra.Command, _ []string) error {
 			}
 		}
 	}
+	return nil
+}
+
+func installConfig() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	dir := filepath.Join(home, ".config", "twine")
+	path := filepath.Join(dir, "config.toml")
+
+	if _, err := os.Stat(path); err == nil {
+		fmt.Printf("Config already exists: %s\n", path)
+		return nil
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("failed to create config dir: %w", err)
+	}
+	if err := os.WriteFile(path, []byte(config.DefaultConfig), 0o644); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
+	}
+	fmt.Printf("✓ Config written to %s\n", path)
+	fmt.Println("  Edit it to set your base_dirs.")
 	return nil
 }
 
