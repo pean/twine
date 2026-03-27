@@ -3,7 +3,7 @@ package commands
 import (
 	"fmt"
 	"os"
-	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -13,12 +13,18 @@ import (
 	"github.com/pean/twine/internal/tmux"
 )
 
-var pruneDryRun bool
+var (
+	pruneDryRun bool
+	pruneAll    bool
+)
 
 var pruneCmd = &cobra.Command{
 	Use:   "prune [repo]",
 	Short: "Clean up gone branches, worktrees, and sessions",
 	Long: `Prune branches whose remote tracking ref has been deleted.
+
+By default only repos with active tmux sessions are checked (fast).
+Use --all to scan every repo in base_dirs.
 
 What it does:
   1. Fetches all remotes and prunes remote tracking branches
@@ -35,6 +41,10 @@ func init() {
 		&pruneDryRun, "dry-run", "n", false,
 		"show what would be removed without doing it",
 	)
+	pruneCmd.Flags().BoolVarP(
+		&pruneAll, "all", "a", false,
+		"prune all repos in base_dirs, not just those with active sessions",
+	)
 }
 
 func runPrune(cmd *cobra.Command, args []string) error {
@@ -50,21 +60,35 @@ func runPrune(cmd *cobra.Command, args []string) error {
 
 	var repos []*repo.Repo
 
-	if len(args) == 1 {
+	switch {
+	case len(args) == 1:
 		r, err := repo.Find(cfg.BaseDirs, args[0])
 		if err != nil {
 			return fmt.Errorf("repository not found: %s", args[0])
 		}
 		repos = []*repo.Repo{r}
-	} else {
+	case pruneAll:
 		repos, err = repo.FindAll(cfg.BaseDirs)
 		if err != nil {
 			return err
 		}
+	default:
+		// Only repos that have at least one active tmux session.
+		sessions, _ := tmux.ListSessions()
+		for _, name := range activeRepoNames(sessions, cfg.SessionPrefix) {
+			r, err := repo.Find(cfg.BaseDirs, name)
+			if err == nil {
+				repos = append(repos, r)
+			}
+		}
 	}
 
 	if len(repos) == 0 {
-		fmt.Println("No repositories found in configured base_dirs")
+		if !pruneAll && len(args) == 0 {
+			fmt.Println("No active sessions found. Run with --all to check all repos.")
+		} else {
+			fmt.Println("No repositories found.")
+		}
 		return nil
 	}
 
@@ -97,9 +121,10 @@ func runPrune(cmd *cobra.Command, args []string) error {
 
 		for _, branch := range goneBranches {
 			sessionName := cfg.SessionPrefix + r.Name + "/" + branch
+			wtPath := r.WorktreePathForBranch(branch)
 
 			if pruneDryRun {
-				if r.IsBare && isDir(filepath.Join(r.Path, branch)) {
+				if wtPath != "" {
 					fmt.Printf("  would remove worktree: %s\n", branch)
 				}
 				if tmux.HasSession(sessionName) {
@@ -122,18 +147,15 @@ func runPrune(cmd *cobra.Command, args []string) error {
 				}
 			}
 
-			if r.IsBare {
-				wtPath := filepath.Join(r.Path, branch)
-				if isDir(wtPath) {
-					if err := r.RemoveWorktree(branch); err != nil {
-						fmt.Fprintf(
-							os.Stderr,
-							"  Warning: failed to remove worktree %s: %v\n",
-							branch, err,
-						)
-					} else {
-						fmt.Printf("  ✓ Removed worktree: %s\n", branch)
-					}
+			if wtPath != "" {
+				if err := git.RunQuiet(r.Path, "worktree", "remove", "--force", wtPath); err != nil {
+					fmt.Fprintf(
+						os.Stderr,
+						"  Warning: failed to remove worktree %s: %v\n",
+						branch, err,
+					)
+				} else {
+					fmt.Printf("  ✓ Removed worktree: %s\n", branch)
 				}
 			}
 
@@ -150,7 +172,6 @@ func runPrune(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Println()
 	repoWord := "repo"
 	if len(repos) != 1 {
 		repoWord = "repos"
@@ -169,3 +190,21 @@ func runPrune(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// activeRepoNames returns unique repo names derived from active tmux session
+// names, stripping the optional session prefix.
+// Session format: {prefix}{repo}/{branch}
+func activeRepoNames(sessions []string, prefix string) []string {
+	seen := map[string]bool{}
+	var names []string
+	for _, s := range sessions {
+		s = strings.TrimPrefix(s, prefix)
+		if idx := strings.Index(s, "/"); idx > 0 {
+			name := s[:idx]
+			if !seen[name] {
+				seen[name] = true
+				names = append(names, name)
+			}
+		}
+	}
+	return names
+}

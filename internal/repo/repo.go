@@ -91,6 +91,26 @@ func FindAll(baseDirs []string) ([]*Repo, error) {
 	return repos, nil
 }
 
+// WorktreePathForBranch returns the absolute worktree path registered in git
+// for branch, or "" if the branch is not checked out in any worktree.
+// This queries git directly rather than inferring the path from the branch name.
+func (r *Repo) WorktreePathForBranch(branch string) string {
+	out, err := git.Run(r.Path, "worktree", "list", "--porcelain")
+	if err != nil {
+		return ""
+	}
+	var cur string
+	for _, line := range strings.Split(out, "\n") {
+		if strings.HasPrefix(line, "worktree ") {
+			cur = strings.TrimPrefix(line, "worktree ")
+		}
+		if line == "branch refs/heads/"+branch && cur != r.Path {
+			return cur
+		}
+	}
+	return ""
+}
+
 // ListWorktrees returns branch/worktree names (relative), excluding bare root.
 func (r *Repo) ListWorktrees() ([]string, error) {
 	out, err := git.Run(r.Path, "worktree", "list", "--porcelain")
