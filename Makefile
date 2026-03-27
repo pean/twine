@@ -7,7 +7,7 @@ test:
 	go test ./...
 
 install:
-	go install ./cmd/twine
+	go build -o ~/.local/bin/twine ./cmd/twine
 
 completions: build
 	./bin/twine completion fish > completions/twine.fish
