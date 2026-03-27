@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/spf13/cobra"
@@ -23,7 +24,10 @@ var sessionCmd = &cobra.Command{
 	Long: `Switch to an existing tmux session or create one for a repo.
 
 Unlike the worktree command, no branch selection is shown.
-Interactive selection is offered when called without arguments.`,
+Interactive selection is offered when called without arguments.
+
+Pass "." or an absolute path to create a session rooted at that directory,
+named after its basename.`,
 	RunE: runSession,
 }
 
@@ -52,6 +56,21 @@ func runSession(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		target = chosen
+	}
+
+	// If target is a path (starts with . or /), resolve to an absolute dir
+	// and use the basename as the session name.
+	if target == "." || filepath.IsAbs(target) {
+		dir, err := filepath.Abs(target)
+		if err != nil {
+			return fmt.Errorf("cannot resolve path: %w", err)
+		}
+		name := cfg.SessionPrefix + strings.TrimLeft(filepath.Base(dir), ".")
+		if err := tmux.NewSession(name, dir); err != nil &&
+			!strings.Contains(err.Error(), "duplicate session") {
+			return fmt.Errorf("failed to create session: %w", err)
+		}
+		return tmux.AttachOrSwitch(name)
 	}
 
 	// Try session names with and without prefix.

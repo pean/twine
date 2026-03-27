@@ -111,7 +111,9 @@ Flags: `-c / --create`, `-f / --from <branch>`
 Faster session switcher — no branch selection, just finds the repo session and attaches.
 
 ```sh
-t my-project
+t my-project                    # switch to repo session
+t .                             # create/attach session for current directory
+t /path/to/dir                  # create/attach session for any directory
 ```
 
 ### `twine kill` (`tk`)

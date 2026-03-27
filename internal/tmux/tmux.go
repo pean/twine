@@ -30,10 +30,20 @@ func IsInsideTmux() bool {
 	return os.Getenv("TMUX") != ""
 }
 
-// HasSession returns true if the named tmux session exists.
+// HasSession returns true if the named tmux session exists (exact match).
 func HasSession(name string) bool {
-	err := exec.Command("tmux", "has-session", "-t", name).Run()
-	return err == nil
+	out, err := exec.Command(
+		"tmux", "list-sessions", "-F", "#{session_name}",
+	).Output()
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		if strings.TrimSpace(line) == name {
+			return true
+		}
+	}
+	return false
 }
 
 // ListSessions returns all session names.
@@ -83,9 +93,16 @@ func ListSessionsFull() ([]SessionInfo, error) {
 
 // NewSession creates a detached tmux session named name in dir.
 func NewSession(name, dir string) error {
-	return exec.Command(
-		"tmux", "new-session", "-d", "-s", name, "-c", dir,
-	).Run()
+	cmd := exec.Command("tmux", "new-session", "-d", "-s", name, "-c", dir)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		msg := strings.TrimSpace(string(out))
+		if msg != "" {
+			return fmt.Errorf("%w: %s", err, msg)
+		}
+		return err
+	}
+	return nil
 }
 
 // KillSession kills the named tmux session.
