@@ -118,6 +118,15 @@ func runWorktree(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		branch = b
+	} else if worktreeRemote {
+		var fetchErr error
+		_ = ui.Spinner("Fetching branches…", func() error {
+			fetchErr = r.Fetch()
+			return nil
+		})
+		if fetchErr != nil {
+			return fmt.Errorf("fetch failed: %w", fetchErr)
+		}
 	}
 
 	worktreePath := filepath.Join(r.Path, branch)
@@ -204,9 +213,15 @@ func convertToBare(repoPath string) error {
 		return fmt.Errorf("not a git repository: %s", repoPath)
 	}
 
+	originURL, _ := git.Run(repoPath, "remote", "get-url", "origin")
+
 	fmt.Printf("Cloning %s as bare…\n", repoName)
 	if err := git.Clone(repoPath, barePath, true); err != nil {
 		return fmt.Errorf("failed to clone as bare: %w", err)
+	}
+
+	if originURL != "" {
+		_ = git.RunQuiet(barePath, "remote", "set-url", "origin", originURL)
 	}
 
 	wtPath := filepath.Join(barePath, currentBranch)
@@ -281,7 +296,7 @@ func selectBranch(r *repo.Repo, repoName string, remote bool) (string, error) {
 			return nil
 		})
 		if fetchErr != nil {
-			fmt.Fprintf(os.Stderr, "Warning: fetch failed: %v\n", fetchErr)
+			return "", fmt.Errorf("fetch failed: %w", fetchErr)
 		}
 		branches, _ := r.ListRemoteBranches()
 		for _, b := range branches {

@@ -137,9 +137,27 @@ func (r *Repo) ListWorktrees() ([]string, error) {
 	return result, nil
 }
 
-// ListRemoteBranches returns remote branch names (strips "origin/" prefix,
-// excludes HEAD).
+// ListRemoteBranches returns remote branch names.
+// For bare repos, branches are stored under refs/heads/ directly (no
+// refs/remotes/origin/ prefix), so we use for-each-ref instead of branch -r.
 func (r *Repo) ListRemoteBranches() ([]string, error) {
+	if r.IsBare {
+		out, err := git.Run(
+			r.Path, "for-each-ref", "--format=%(refname:short)", "refs/heads/",
+		)
+		if err != nil {
+			return nil, err
+		}
+		var result []string
+		for _, line := range strings.Split(out, "\n") {
+			line = strings.TrimSpace(line)
+			if line != "" {
+				result = append(result, line)
+			}
+		}
+		return result, nil
+	}
+
 	out, err := git.Run(r.Path, "branch", "-r")
 	if err != nil {
 		return nil, err
