@@ -137,40 +137,20 @@ func (r *Repo) ListWorktrees() ([]string, error) {
 	return result, nil
 }
 
-// ListRemoteBranches returns remote branch names.
-// For bare repos, branches are stored under refs/heads/ directly (no
-// refs/remotes/origin/ prefix), so we use for-each-ref instead of branch -r.
+// ListRemoteBranches returns remote branch names (stripped of the "origin/" prefix).
+// Both bare and non-bare repos use refs/remotes/origin/ for remote tracking refs.
 func (r *Repo) ListRemoteBranches() ([]string, error) {
-	if r.IsBare {
-		out, err := git.Run(
-			r.Path, "for-each-ref", "--format=%(refname:short)", "refs/heads/",
-		)
-		if err != nil {
-			return nil, err
-		}
-		var result []string
-		for _, line := range strings.Split(out, "\n") {
-			line = strings.TrimSpace(line)
-			if line != "" {
-				result = append(result, line)
-			}
-		}
-		return result, nil
-	}
-
-	out, err := git.Run(r.Path, "branch", "-r")
+	out, err := git.Run(
+		r.Path, "for-each-ref", "--format=%(refname:short)", "refs/remotes/origin/",
+	)
 	if err != nil {
 		return nil, err
 	}
 	var result []string
 	for _, line := range strings.Split(out, "\n") {
 		line = strings.TrimSpace(line)
-		line = strings.TrimPrefix(line, "* ")
-		if !strings.HasPrefix(line, "origin/") {
-			continue
-		}
 		name := strings.TrimPrefix(line, "origin/")
-		if name == "HEAD" || strings.Contains(name, "->") {
+		if name == "" || name == "HEAD" || strings.Contains(name, "->") {
 			continue
 		}
 		result = append(result, name)

@@ -186,7 +186,16 @@ func cloneBarPrompt(repoName string, cfg *config.Config) (*repo.Repo, error) {
 	}
 
 	fmt.Printf("✓ Cloned: %s\n", barePath)
-	return &repo.Repo{Path: barePath, Name: repoName, IsBare: true}, nil
+
+	r := &repo.Repo{Path: barePath, Name: repoName, IsBare: true}
+
+	// A bare clone does not populate refs/remotes/origin/; fetch now so that
+	// AddWorktree (called next) can resolve remote tracking refs correctly.
+	_ = ui.Spinner("Fetching remote branches…", func() error {
+		return r.Fetch()
+	})
+
+	return r, nil
 }
 
 // isOrgRepo returns true for "org/repo" style shorthands (no slashes elsewhere,
@@ -224,6 +233,14 @@ func convertToBare(repoPath string) error {
 		_ = git.RunQuiet(barePath, "remote", "set-url", "origin", originURL)
 	}
 
+	// A bare clone from a local path doesn't set a fetch refspec; add one now
+	// so that fetch populates refs/remotes/origin/ for proper tracking.
+	_ = git.RunQuiet(
+		barePath, "config", "remote.origin.fetch",
+		"+refs/heads/*:refs/remotes/origin/*",
+	)
+	_ = git.RunQuiet(barePath, "fetch", "--all", "-p")
+
 	wtPath := filepath.Join(barePath, currentBranch)
 	if err := git.RunQuiet(
 		barePath, "worktree", "add", wtPath, currentBranch,
@@ -231,6 +248,9 @@ func convertToBare(repoPath string) error {
 		fmt.Fprintf(os.Stderr, "Warning: failed to create worktree: %v\n", err)
 	} else {
 		fmt.Printf("✓ Worktree created: %s\n", wtPath)
+		_ = git.RunQuiet(
+			barePath, "branch", "--set-upstream-to=origin/"+currentBranch, currentBranch,
+		)
 	}
 
 	fmt.Printf("Old repository at %s — remove it? (y/N) ", repoPath)

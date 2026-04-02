@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -92,6 +93,81 @@ func TestFind_stripsGitSuffix(t *testing.T) {
 	}
 	if r.Name != "myrepo" {
 		t.Errorf("expected name %q, got %q", "myrepo", r.Name)
+	}
+}
+
+// setupClonedBareRepo creates a regular origin repo with a commit and clones it
+// bare, then sets the fetch refspec and runs fetch so refs/remotes/origin/ is
+// populated (matching what a real remote bare clone produces).
+func setupClonedBareRepo(t *testing.T) (originPath, barePath string) {
+	t.Helper()
+	base := t.TempDir()
+
+	// Create origin repo with a commit on main.
+	originPath = filepath.Join(base, "origin")
+	run := func(dir string, args ...string) {
+		t.Helper()
+		cmd := exec.Command(args[0], args[1:]...)
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("%v: %s", args, out)
+		}
+	}
+	run(base, "git", "init", "-b", "main", originPath)
+	run(originPath, "git", "config", "user.email", "test@example.com")
+	run(originPath, "git", "config", "user.name", "Test")
+	run(originPath, "git", "commit", "--allow-empty", "-m", "init")
+
+	// Bare clone of origin.
+	barePath = filepath.Join(base, "repo.git")
+	run(base, "git", "clone", "--bare", originPath, barePath)
+
+	// Set fetch refspec (bare clones from local paths don't set one; remote
+	// clones do — replicate that here so the test matches production behaviour).
+	run(barePath, "git", "config", "remote.origin.fetch",
+		"+refs/heads/*:refs/remotes/origin/*")
+	run(barePath, "git", "fetch", "--all")
+	return originPath, barePath
+}
+
+func TestListRemoteBranches_bare(t *testing.T) {
+	_, barePath := setupClonedBareRepo(t)
+
+	r := &Repo{Path: barePath, IsBare: true}
+	branches, err := r.ListRemoteBranches()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	found := false
+	for _, b := range branches {
+		if strings.HasPrefix(b, "origin/") {
+			t.Errorf("branch should not include origin/ prefix: %q", b)
+		}
+		if b == "main" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected 'main' in remote branches, got: %v", branches)
+	}
+}
+
+func TestAddWorktree_setsUpstream(t *testing.T) {
+	_, barePath := setupClonedBareRepo(t)
+
+	r := &Repo{Path: barePath, Name: "repo", IsBare: true}
+	if err := r.AddWorktree("main", "", false); err != nil {
+		t.Fatalf("AddWorktree: %v", err)
+	}
+
+	// Verify branch.main.remote is set in the bare repo config.
+	cmd := exec.Command("git", "-C", barePath, "config", "branch.main.remote")
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("branch.main.remote not set: %v", err)
+	}
+	if remote := strings.TrimSpace(string(out)); remote != "origin" {
+		t.Errorf("expected branch.main.remote=origin, got %q", remote)
 	}
 }
 
