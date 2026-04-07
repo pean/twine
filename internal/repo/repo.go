@@ -358,3 +358,14 @@ func (r *Repo) Fetch() error {
 	_ = git.RunQuiet(r.Path, "worktree", "prune")
 	return nil
 }
+
+// SetupRemoteTracking ensures the named remote has a fetch refspec that maps
+// refs/heads/* → refs/remotes/<remote>/* and then fetches.
+// A bare clone (both `git clone --bare` and `gh repo clone -- --bare`) does
+// not write this refspec, so refs/remotes/<remote>/ is never populated until
+// this is called.
+func (r *Repo) SetupRemoteTracking(remote string) error {
+	refspec := "+refs/heads/*:refs/remotes/" + remote + "/*"
+	_ = git.RunQuiet(r.Path, "config", "remote."+remote+".fetch", refspec)
+	return r.Fetch()
+}

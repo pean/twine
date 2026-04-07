@@ -171,6 +171,60 @@ func TestAddWorktree_setsUpstream(t *testing.T) {
 	}
 }
 
+// TestSetupRemoteTracking verifies that a bare clone without a fetch refspec
+// (the state produced by both `git clone --bare` and `gh repo clone -- --bare`
+// from a real remote) is fixed by SetupRemoteTracking.
+func TestSetupRemoteTracking(t *testing.T) {
+	base := t.TempDir()
+
+	// Create origin repo.
+	originPath := filepath.Join(base, "origin")
+	run := func(dir string, args ...string) {
+		t.Helper()
+		cmd := exec.Command(args[0], args[1:]...)
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("%v: %s", args, out)
+		}
+	}
+	run(base, "git", "init", "-b", "main", originPath)
+	run(originPath, "git", "config", "user.email", "test@example.com")
+	run(originPath, "git", "config", "user.name", "Test")
+	run(originPath, "git", "commit", "--allow-empty", "-m", "init")
+
+	// Bare clone — intentionally skip setting the fetch refspec so we start
+	// in the broken state that `git clone --bare` from a real remote produces.
+	barePath := filepath.Join(base, "repo.git")
+	run(base, "git", "clone", "--bare", originPath, barePath)
+
+	r := &Repo{Path: barePath, Name: "repo", IsBare: true}
+
+	// Before fix: no remote tracking refs.
+	branches, _ := r.ListRemoteBranches()
+	if len(branches) != 0 {
+		t.Fatalf("expected no remote branches before setup, got: %v", branches)
+	}
+
+	if err := r.SetupRemoteTracking("origin"); err != nil {
+		t.Fatalf("SetupRemoteTracking: %v", err)
+	}
+
+	// After fix: refs/remotes/origin/main should be present.
+	branches, err := r.ListRemoteBranches()
+	if err != nil {
+		t.Fatalf("ListRemoteBranches: %v", err)
+	}
+	found := false
+	for _, b := range branches {
+		if b == "main" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected 'main' after SetupRemoteTracking, got: %v", branches)
+	}
+}
+
 func TestFindAll(t *testing.T) {
 	base := t.TempDir()
 	initBareRepo(t, base, "alpha")
