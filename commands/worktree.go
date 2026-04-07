@@ -189,10 +189,11 @@ func cloneBarPrompt(repoName string, cfg *config.Config) (*repo.Repo, error) {
 
 	r := &repo.Repo{Path: barePath, Name: repoName, IsBare: true}
 
-	// A bare clone does not populate refs/remotes/origin/; fetch now so that
-	// AddWorktree (called next) can resolve remote tracking refs correctly.
+	// A bare clone (both git and gh) does not set a fetch refspec, so
+	// refs/remotes/origin/ is never populated.  Set the refspec first, then
+	// fetch so that AddWorktree can resolve remote tracking refs correctly.
 	_ = ui.Spinner("Fetching remote branches…", func() error {
-		return r.Fetch()
+		return r.SetupRemoteTracking("origin")
 	})
 
 	return r, nil
@@ -235,11 +236,8 @@ func convertToBare(repoPath string) error {
 
 	// A bare clone from a local path doesn't set a fetch refspec; add one now
 	// so that fetch populates refs/remotes/origin/ for proper tracking.
-	_ = git.RunQuiet(
-		barePath, "config", "remote.origin.fetch",
-		"+refs/heads/*:refs/remotes/origin/*",
-	)
-	_ = git.RunQuiet(barePath, "fetch", "--all", "-p")
+	bareRepo := &repo.Repo{Path: barePath, Name: repoName, IsBare: true}
+	_ = bareRepo.SetupRemoteTracking("origin")
 
 	wtPath := filepath.Join(barePath, currentBranch)
 	if err := git.RunQuiet(
