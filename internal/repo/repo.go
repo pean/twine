@@ -322,6 +322,10 @@ func (r *Repo) SetUpstream(branch, upstream string) error {
 }
 
 // GoneBranches returns branches whose remote tracking ref is "gone".
+// A branch is "gone" when it previously tracked a remote branch that has
+// since been deleted — for example after a merged pull request is cleaned up.
+// Branches that have never been pushed (no upstream configured) are NOT gone
+// and will never be returned here.
 func (r *Repo) GoneBranches() ([]string, error) {
 	out, err := git.Run(r.Path, "branch", "-vv")
 	if err != nil {
@@ -329,24 +333,43 @@ func (r *Repo) GoneBranches() ([]string, error) {
 	}
 	var result []string
 	for _, line := range strings.Split(out, "\n") {
-		if !strings.Contains(line, ": gone]") {
-			continue
+		if isGoneBranchLine(line) {
+			result = append(result, parseBranchName(line))
 		}
-		fields := strings.Fields(line)
-		if len(fields) < 1 {
-			continue
-		}
-		name := fields[0]
-		if name == "*" || name == "+" {
-			if len(fields) >= 2 {
-				name = fields[1]
-			} else {
-				continue
-			}
-		}
-		result = append(result, name)
 	}
 	return result, nil
+}
+
+// isGoneBranchLine reports whether a "git branch -vv" output line represents a
+// branch whose remote tracking ref has been deleted.
+//
+// git branch -vv produces lines like:
+//
+//	  feature/foo  abc1234 [origin/feature/foo: gone] commit message
+//	* main         def5678 [origin/main] commit message
+//	  local-only   ghi9012 commit message
+//
+// Only the first example is "gone" — the remote branch was deleted.
+func isGoneBranchLine(line string) bool {
+	return strings.Contains(line, ": gone]")
+}
+
+// parseBranchName extracts the branch name from a "git branch -vv" output line.
+// git prefixes the currently checked-out branch with "* " and branches that are
+// checked out in another worktree with "+ ". All other branches have no prefix.
+func parseBranchName(line string) string {
+	fields := strings.Fields(line)
+	if len(fields) == 0 {
+		return ""
+	}
+	// Skip the "*" or "+" marker to get to the actual branch name.
+	if fields[0] == "*" || fields[0] == "+" {
+		if len(fields) >= 2 {
+			return fields[1]
+		}
+		return ""
+	}
+	return fields[0]
 }
 
 // Fetch runs git fetch --all -p and prunes stale worktree refs.
