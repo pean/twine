@@ -222,10 +222,11 @@ func (r *Repo) hasLocalBranch(branch string) bool {
 	return false
 }
 
-// AddWorktree creates a worktree for branch. Three cases:
+// AddWorktree creates a worktree for branch. Four cases:
 //  1. Remote AND local branch exist → worktree add + set-upstream
 //  2. Remote only → worktree add -b from origin/$branch
-//  3. New branch (createNew) → worktree add -b from startPoint
+//  3. Local only → worktree add (no upstream)
+//  4. New branch (createNew) → worktree add -b from startPoint
 func (r *Repo) AddWorktree(branch, startPoint string, createNew bool) error {
 	wtPath := filepath.Join(r.Path, branch)
 
@@ -255,6 +256,15 @@ func (r *Repo) AddWorktree(branch, startPoint string, createNew bool) error {
 			"-b", branch,
 			wtPath,
 			"origin/"+branch,
+		); err != nil {
+			return fmt.Errorf("worktree add failed: %w", err)
+		}
+		return nil
+	}
+
+	if hasLocal {
+		if err := git.RunQuiet(
+			r.Path, "worktree", "add", wtPath, branch,
 		); err != nil {
 			return fmt.Errorf("worktree add failed: %w", err)
 		}
