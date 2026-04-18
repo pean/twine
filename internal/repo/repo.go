@@ -275,7 +275,16 @@ func (r *Repo) AddWorktree(branch, startPoint string, createNew bool) error {
 		if startPoint == "" {
 			base, err := r.DefaultBranch()
 			if err != nil {
-				return err
+				// Empty repo: no commits, no remote — create an orphan branch.
+				if err := git.RunQuiet(
+					r.Path,
+					"worktree", "add",
+					"-b", branch,
+					wtPath,
+				); err != nil {
+					return fmt.Errorf("worktree add failed: %w", err)
+				}
+				return nil
 			}
 			// Prefer remote start point.
 			if r.hasRemoteBranch(base) {
