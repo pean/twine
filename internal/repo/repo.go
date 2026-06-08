@@ -17,6 +17,33 @@ type Repo struct {
 	IsBare bool
 }
 
+// WorktreeEntry is a single worktree across all repos.
+type WorktreeEntry struct {
+	Repo   *Repo
+	Branch string
+	Path   string
+}
+
+// ListAllWorktrees returns all worktrees across all repos in baseDirs.
+func ListAllWorktrees(baseDirs []string) ([]WorktreeEntry, error) {
+	repos, err := FindAll(baseDirs)
+	if err != nil {
+		return nil, err
+	}
+	var entries []WorktreeEntry
+	for _, r := range repos {
+		worktrees, _ := r.ListWorktrees()
+		for _, wt := range worktrees {
+			entries = append(entries, WorktreeEntry{
+				Repo:   r,
+				Branch: wt,
+				Path:   filepath.Join(r.Path, wt),
+			})
+		}
+	}
+	return entries, nil
+}
+
 // Find searches baseDirs for a repo named name (bare preferred).
 func Find(baseDirs []string, name string) (*Repo, error) {
 	name = strings.TrimSuffix(name, ".git")
@@ -229,6 +256,10 @@ func (r *Repo) hasLocalBranch(branch string) bool {
 //  4. New branch (createNew) → worktree add -b from startPoint
 func (r *Repo) AddWorktree(branch, startPoint string, createNew bool) error {
 	wtPath := filepath.Join(r.Path, branch)
+
+	if err := os.MkdirAll(filepath.Dir(wtPath), 0o755); err != nil {
+		return fmt.Errorf("failed to create worktree parent dir: %w", err)
+	}
 
 	hasRemote := r.hasRemoteBranch(branch)
 	hasLocal := r.hasLocalBranch(branch)

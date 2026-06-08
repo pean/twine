@@ -29,4 +29,6 @@ func init() {
 	rootCmd.AddCommand(agentsCmd)
 	rootCmd.AddCommand(killCmd)
 	rootCmd.AddCommand(installCmd)
+	rootCmd.AddCommand(openCmd)
+	rootCmd.AddCommand(listCmd)
 }
