@@ -230,6 +230,10 @@ func (r *Repo) hasLocalBranch(branch string) bool {
 func (r *Repo) AddWorktree(branch, startPoint string, createNew bool) error {
 	wtPath := filepath.Join(r.Path, branch)
 
+	if err := os.MkdirAll(filepath.Dir(wtPath), 0o755); err != nil {
+		return fmt.Errorf("failed to create worktree parent dir: %w", err)
+	}
+
 	hasRemote := r.hasRemoteBranch(branch)
 	hasLocal := r.hasLocalBranch(branch)
 
