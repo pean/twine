@@ -132,8 +132,11 @@ func runWorktree(cmd *cobra.Command, args []string) error {
 	worktreePath := filepath.Join(r.Path, branch)
 	sessionName := cfg.SessionPrefix + repoName + "/" + branch
 
-	// ---- create worktree if needed ----
-	if _, err := os.Stat(worktreePath); os.IsNotExist(err) {
+	// A worktree for this branch may already exist at a different path
+	// (e.g. created before slashes in branch names mapped to subdirectories).
+	if existing := r.WorktreePathForBranch(branch); existing != "" {
+		worktreePath = existing
+	} else if _, err := os.Stat(worktreePath); os.IsNotExist(err) {
 		fmt.Printf("Creating worktree for %q…\n", branch)
 		if err := r.AddWorktree(branch, worktreeFromBase, worktreeCreate); err != nil {
 			return err
