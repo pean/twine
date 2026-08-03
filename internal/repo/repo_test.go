@@ -249,3 +249,62 @@ func TestFindAll(t *testing.T) {
 		t.Errorf("unexpected repos: %v", names)
 	}
 }
+
+func TestIsCheckedOutAtRoot(t *testing.T) {
+	base := t.TempDir()
+	mainPath := initRegularRepo(t, base, "myrepo")
+
+	run := func(dir string, args ...string) {
+		t.Helper()
+		cmd := exec.Command(args[0], args[1:]...)
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("%v: %s", args, out)
+		}
+	}
+	run(mainPath, "git", "config", "user.email", "test@example.com")
+	run(mainPath, "git", "config", "user.name", "Test")
+	run(mainPath, "git", "commit", "--allow-empty", "-m", "init")
+	run(mainPath, "git", "checkout", "-b", "release-v1")
+
+	r := &Repo{Path: mainPath, Name: "myrepo", IsBare: false}
+
+	if !r.IsCheckedOutAtRoot("release-v1") {
+		t.Error("expected release-v1 to be checked out at repo root")
+	}
+	if r.IsCheckedOutAtRoot("nonexistent") {
+		t.Error("nonexistent branch should not be checked out at root")
+	}
+}
+
+func TestFindAll_skipsLinkedWorktrees(t *testing.T) {
+	base := t.TempDir()
+	mainPath := initRegularRepo(t, base, "main-repo")
+
+	run := func(dir string, args ...string) {
+		t.Helper()
+		cmd := exec.Command(args[0], args[1:]...)
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("%v: %s", args, out)
+		}
+	}
+	run(mainPath, "git", "config", "user.email", "test@example.com")
+	run(mainPath, "git", "config", "user.name", "Test")
+	run(mainPath, "git", "commit", "--allow-empty", "-m", "init")
+	run(mainPath, "git", "branch", "feature")
+
+	linkedPath := filepath.Join(base, "main-repo-feature")
+	run(mainPath, "git", "worktree", "add", linkedPath, "feature")
+
+	repos, err := FindAll([]string{base})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(repos) != 1 {
+		t.Fatalf("expected 1 repo, got %d: %v", len(repos), repos)
+	}
+	if repos[0].Name != "main-repo" {
+		t.Errorf("unexpected repo found: %v", repos[0].Name)
+	}
+}

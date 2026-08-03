@@ -101,8 +101,11 @@ func FindAll(baseDirs []string) ([]*Repo, error) {
 						}
 					}
 				} else {
-					// Regular repos have a .git entry at their root.
-					if _, err := os.Stat(filepath.Join(path, ".git")); err == nil {
+					// Regular repos have a .git directory at their root.
+					// Linked worktrees (e.g. `git worktree add` siblings) have a
+					// .git file pointing back at the main repo instead — skip
+					// those so they aren't scanned as independent repos.
+					if info, err := os.Stat(filepath.Join(path, ".git")); err == nil && info.IsDir() {
 						r = &Repo{Path: path, Name: name, IsBare: false}
 					}
 				}
@@ -118,6 +121,45 @@ func FindAll(baseDirs []string) ([]*Repo, error) {
 	return repos, nil
 }
 
+// samePath reports whether a and b refer to the same directory, resolving
+// symlinks first (e.g. macOS's /var -> /private/var) since git's worktree
+// list may report a resolved path that differs textually from r.Path.
+func samePath(a, b string) bool {
+	if a == b {
+		return true
+	}
+	ra, err := filepath.EvalSymlinks(a)
+	if err != nil {
+		return false
+	}
+	rb, err := filepath.EvalSymlinks(b)
+	if err != nil {
+		return false
+	}
+	return ra == rb
+}
+
+// IsCheckedOutAtRoot reports whether branch is the branch currently checked
+// out at the repo root itself (r.Path) — e.g. a non-bare repo whose main
+// working tree has branch checked out, rather than a separate worktree.
+// Such a branch cannot be deleted without first switching away from it.
+func (r *Repo) IsCheckedOutAtRoot(branch string) bool {
+	out, err := git.Run(r.Path, "worktree", "list", "--porcelain")
+	if err != nil {
+		return false
+	}
+	var cur string
+	for _, line := range strings.Split(out, "\n") {
+		if strings.HasPrefix(line, "worktree ") {
+			cur = strings.TrimPrefix(line, "worktree ")
+		}
+		if line == "branch refs/heads/"+branch && samePath(cur, r.Path) {
+			return true
+		}
+	}
+	return false
+}
+
 // WorktreePathForBranch returns the absolute worktree path registered in git
 // for branch, or "" if the branch is not checked out in any worktree.
 // This queries git directly rather than inferring the path from the branch name.
@@ -131,7 +173,7 @@ func (r *Repo) WorktreePathForBranch(branch string) string {
 		if strings.HasPrefix(line, "worktree ") {
 			cur = strings.TrimPrefix(line, "worktree ")
 		}
-		if line == "branch refs/heads/"+branch && cur != r.Path {
+		if line == "branch refs/heads/"+branch && !samePath(cur, r.Path) {
 			return cur
 		}
 	}

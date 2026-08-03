@@ -123,6 +123,15 @@ func runPrune(cmd *cobra.Command, args []string) error {
 			sessionName := cfg.SessionPrefix + r.Name + "/" + branch
 			wtPath := r.WorktreePathForBranch(branch)
 
+			if r.IsCheckedOutAtRoot(branch) {
+				fmt.Printf(
+					"  Skipping %s: checked out at repo root, switch"+
+						" branches first\n",
+					branch,
+				)
+				continue
+			}
+
 			if pruneDryRun {
 				if wtPath != "" {
 					fmt.Printf("  would remove worktree: %s\n", branch)
