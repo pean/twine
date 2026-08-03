@@ -1,6 +1,8 @@
 package git
 
 import (
+	"bytes"
+	"fmt"
 	"os/exec"
 	"strings"
 )
@@ -12,10 +14,20 @@ func Run(repoPath string, args ...string) (string, error) {
 	return strings.TrimSpace(string(out)), err
 }
 
-// RunQuiet executes a git command in repoPath, discarding output.
+// RunQuiet executes a git command in repoPath, discarding stdout. On
+// failure, the error includes git's stderr output for diagnosability.
 func RunQuiet(repoPath string, args ...string) error {
 	cmdArgs := append([]string{"-C", repoPath}, args...)
-	return exec.Command("git", cmdArgs...).Run()
+	cmd := exec.Command("git", cmdArgs...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		if msg := strings.TrimSpace(stderr.String()); msg != "" {
+			return fmt.Errorf("%w: %s", err, msg)
+		}
+		return err
+	}
+	return nil
 }
 
 // Clone clones url into dest. Bare clone when bare is true.
