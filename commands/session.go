@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/pean/twine/internal/config"
+	"github.com/pean/twine/internal/git"
 	"github.com/pean/twine/internal/repo"
 	"github.com/pean/twine/internal/tmux"
 	"github.com/pean/twine/internal/ui"
@@ -67,7 +68,7 @@ func runSession(cmd *cobra.Command, args []string) error {
 		}
 		name := cfg.SessionPrefix + strings.TrimLeft(filepath.Base(dir), ".")
 		if !tmux.HasSession(name) {
-			if cfg.ShouldUseTmuxinator() {
+			if git.IsGitRepo(dir) && cfg.ShouldUseTmuxinator() {
 				if err := runTmuxinator(name, dir, cfg); err != nil {
 					return err
 				}
