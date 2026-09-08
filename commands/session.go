@@ -18,6 +18,8 @@ import (
 	"github.com/pean/twine/internal/ui"
 )
 
+var sessionBackground bool
+
 var sessionCmd = &cobra.Command{
 	Use:     "session [repo-or-session]",
 	Aliases: []string{"ts"},
@@ -30,6 +32,20 @@ Interactive selection is offered when called without arguments.
 Pass "." or an absolute path to create a session rooted at that directory,
 named after its basename.`,
 	RunE: runSession,
+}
+
+func init() {
+	sessionCmd.Flags().BoolVarP(
+		&sessionBackground, "background", "b", false,
+		"create the session without attaching or switching to it",
+	)
+}
+
+func attachOrSwitchUnlessBackground(name string) error {
+	if sessionBackground {
+		return nil
+	}
+	return tmux.AttachOrSwitch(name)
 }
 
 func runSession(cmd *cobra.Command, args []string) error {
@@ -79,14 +95,14 @@ func runSession(cmd *cobra.Command, args []string) error {
 				}
 			}
 		}
-		return tmux.AttachOrSwitch(name)
+		return attachOrSwitchUnlessBackground(name)
 	}
 
 	// Try session names with and without prefix.
 	names := []string{cfg.SessionPrefix + target, target}
 	for _, name := range names {
 		if tmux.HasSession(name) {
-			return tmux.AttachOrSwitch(name)
+			return attachOrSwitchUnlessBackground(name)
 		}
 	}
 
@@ -119,7 +135,7 @@ func runSession(cmd *cobra.Command, args []string) error {
 					)
 				}
 			}
-			return tmux.AttachOrSwitch(name)
+			return attachOrSwitchUnlessBackground(name)
 		}
 	}
 
@@ -130,7 +146,7 @@ func runSession(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to create session: %w", err)
 		}
 	}
-	return tmux.AttachOrSwitch(fallback)
+	return attachOrSwitchUnlessBackground(fallback)
 }
 
 func selectSession(cfg *config.Config) (string, error) {

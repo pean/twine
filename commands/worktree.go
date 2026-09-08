@@ -19,9 +19,10 @@ import (
 )
 
 var (
-	worktreeCreate   bool
-	worktreeFromBase string
-	worktreeRemote   bool
+	worktreeCreate     bool
+	worktreeFromBase   string
+	worktreeRemote     bool
+	worktreeBackground bool
 )
 
 var worktreeCmd = &cobra.Command{
@@ -48,6 +49,10 @@ func init() {
 	worktreeCmd.Flags().BoolVarP(
 		&worktreeRemote, "remote", "r", false,
 		"fetch and show remote branches instead of local",
+	)
+	worktreeCmd.Flags().BoolVarP(
+		&worktreeBackground, "background", "b", false,
+		"create the session without attaching or switching to it",
 	)
 }
 
@@ -157,6 +162,9 @@ func runWorktree(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	if worktreeBackground {
+		return nil
+	}
 	return tmux.AttachOrSwitch(sessionName)
 }
 
