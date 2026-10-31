@@ -4,11 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/pean/twine/internal/config"
+	"github.com/pean/twine/internal/mux"
 	"github.com/pean/twine/internal/repo"
 	"github.com/pean/twine/internal/ui"
 )
@@ -18,8 +20,8 @@ var killWorktree bool
 var killCmd = &cobra.Command{
 	Use:     "kill [session...]",
 	Aliases: []string{"tk"},
-	Short:   "Kill tmux sessions with optional worktree removal",
-	Long: `Kill one or more tmux sessions.
+	Short:   "Kill sessions with optional worktree removal",
+	Long: `Kill one or more sessions, in whichever multiplexer runs them.
 
 When called without session arguments, interactive multi-select is shown and
 you are asked whether to also remove worktrees for repo/branch sessions.
@@ -40,23 +42,29 @@ func runKill(cmd *cobra.Command, args []string) error {
 	interactive := len(sessions) == 0
 
 	cfg, _ := config.Load()
-	mx := multiplexer(cfg)
+	set, err := muxSet(cfg)
+	if err != nil {
+		return err
+	}
+
+	// targets maps each session to kill to the backends running it. In
+	// interactive mode that is the backend it was picked from; for names
+	// given as arguments, every backend that has a session of that name.
+	targets := map[string][]mux.Multiplexer{}
 
 	if interactive {
-		all, err := mx.ListSessions()
-		if err != nil {
-			return fmt.Errorf("failed to list sessions: %w", err)
-		}
+		all := set.Sessions()
 		if len(all) == 0 {
-			fmt.Printf("No %s sessions running.\n", mx.Name())
+			fmt.Println("No sessions running.")
 			return nil
 		}
 
 		items := make([]ui.Item, 0, len(all))
-		for _, s := range all {
+		for i, s := range all {
 			items = append(items, ui.Item{
-				Title:  fmt.Sprintf("%s  %s  %dw", s.Name, s.Path, s.Windows),
-				Value:  s.Name,
+				Title: fmt.Sprintf("%s%s  %s  %dw",
+					s.Name, muxLabel(set, s.Backend), s.Path, s.Windows),
+				Value:  strconv.Itoa(i),
 				Active: true,
 			})
 		}
@@ -71,7 +79,12 @@ func runKill(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		for _, item := range chosen {
-			sessions = append(sessions, item.Value)
+			i, _ := strconv.Atoi(item.Value)
+			s := all[i]
+			if _, seen := targets[s.Name]; !seen {
+				sessions = append(sessions, s.Name)
+			}
+			targets[s.Name] = append(targets[s.Name], s.Backend)
 		}
 
 		// In interactive mode, ask about worktree removal if any selected
@@ -87,12 +100,24 @@ func runKill(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, session := range sessions {
-		if err := mx.KillSession(session); err != nil {
+		owners, picked := targets[session]
+		if !picked {
+			owners = set.Owners(session)
+		}
+		if len(owners) == 0 {
 			fmt.Fprintf(os.Stderr,
-				"Warning: could not kill session %q: %v\n", session, err,
+				"Warning: could not kill session %q: no such session\n", session,
 			)
-		} else {
-			fmt.Printf("Killed session: %s\n", session)
+		}
+		for _, m := range owners {
+			if err := m.KillSession(session); err != nil {
+				fmt.Fprintf(os.Stderr,
+					"Warning: could not kill session %q%s: %v\n",
+					session, muxLabel(set, m), err,
+				)
+			} else {
+				fmt.Printf("Killed session: %s%s\n", session, muxLabel(set, m))
+			}
 		}
 
 		if !killWorktree {

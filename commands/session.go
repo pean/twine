@@ -58,7 +58,10 @@ func runSession(cmd *cobra.Command, args []string) error {
 		)
 	}
 
-	m := multiplexer(cfg)
+	set, err := muxSet(cfg)
+	if err != nil {
+		return err
+	}
 
 	target := ""
 	if len(args) >= 1 {
@@ -66,7 +69,7 @@ func runSession(cmd *cobra.Command, args []string) error {
 	}
 
 	if target == "" {
-		chosen, err := selectSession(cfg, m)
+		chosen, err := selectSession(cfg, set)
 		if errors.Is(err, ui.ErrCancelled) {
 			return nil
 		}
@@ -83,24 +86,22 @@ func runSession(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("cannot resolve path: %w", err)
 		}
-		name := cfg.SessionPrefix + strings.TrimLeft(filepath.Base(dir), ".")
-		if !m.HasSession(name) {
-			// Layouts only apply to git repos.
-			useLayout := git.IsGitRepo(dir)
-			err := m.NewSession(name, dir, mux.NewSessionOptions{
-				UseLayout: useLayout,
-			})
-			if err != nil && !errors.Is(err, mux.ErrSessionExists) {
-				return fmt.Errorf("failed to create session: %w", err)
-			}
+		repoName := strings.TrimLeft(filepath.Base(dir), ".")
+		name := cfg.SessionPrefix + repoName
+		// Layouts only apply to git repos.
+		m, err := ensureSession(set, repoName, name, dir, mux.NewSessionOptions{
+			UseLayout: git.IsGitRepo(dir),
+		})
+		if err != nil {
+			return err
 		}
 		return attachOrSwitchUnlessBackground(m, name)
 	}
 
-	// Try session names with and without prefix.
+	// Try session names with and without prefix, in every backend.
 	names := []string{cfg.SessionPrefix + target, target}
 	for _, name := range names {
-		if m.HasSession(name) {
+		if m, ok := set.Find(target, name); ok {
 			return attachOrSwitchUnlessBackground(m, name)
 		}
 	}
@@ -123,11 +124,11 @@ func runSession(cmd *cobra.Command, args []string) error {
 				continue
 			}
 
-			err := m.NewSession(name, repoPath, mux.NewSessionOptions{
+			m, err := ensureSession(set, target, name, repoPath, mux.NewSessionOptions{
 				UseLayout: true,
 			})
 			if err != nil {
-				return fmt.Errorf("failed to create session: %w", err)
+				return err
 			}
 			return attachOrSwitchUnlessBackground(m, name)
 		}
@@ -135,23 +136,21 @@ func runSession(cmd *cobra.Command, args []string) error {
 
 	// No repo found – create a basic session.
 	fallback := names[len(names)-1]
-	if !m.HasSession(fallback) {
-		err := m.NewSession(fallback, ".", mux.NewSessionOptions{})
-		if err != nil {
-			return fmt.Errorf("failed to create session: %w", err)
-		}
+	m, err := ensureSession(set, "", fallback, ".", mux.NewSessionOptions{})
+	if err != nil {
+		return err
 	}
 	return attachOrSwitchUnlessBackground(m, fallback)
 }
 
-func selectSession(cfg *config.Config, m mux.Multiplexer) (string, error) {
+func selectSession(cfg *config.Config, set *mux.Set) (string, error) {
 	var (
 		sessions []string
 		allRepos []*repo.Repo
 		wg       sync.WaitGroup
 	)
 	wg.Add(2)
-	go func() { defer wg.Done(); sessions = sessionNames(m) }()
+	go func() { defer wg.Done(); sessions = set.SessionNames() }()
 	go func() { defer wg.Done(); allRepos, _ = repo.FindAll(cfg.BaseDirs) }()
 	wg.Wait()
 

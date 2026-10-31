@@ -67,6 +67,11 @@ func runWorktree(cmd *cobra.Command, args []string) error {
 		)
 	}
 
+	set, err := muxSet(cfg)
+	if err != nil {
+		return err
+	}
+
 	repoName := ""
 	branch := ""
 	if len(args) >= 1 {
@@ -78,7 +83,7 @@ func runWorktree(cmd *cobra.Command, args []string) error {
 
 	// ---- repo selection ----
 	if repoName == "" {
-		name, err := selectRepo(cfg)
+		name, err := selectRepo(cfg, set)
 		if err != nil {
 			return err
 		}
@@ -150,15 +155,11 @@ func runWorktree(cmd *cobra.Command, args []string) error {
 	}
 
 	// ---- create or switch session ----
-	m := multiplexer(cfg)
-	if !m.HasSession(sessionName) {
-		fmt.Printf("Creating %s session: %s\n", m.Name(), sessionName)
-		err = m.NewSession(sessionName, worktreePath, mux.NewSessionOptions{
-			UseLayout: true,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to create session: %w", err)
-		}
+	m, err := ensureSession(set, repoName, sessionName, worktreePath,
+		mux.NewSessionOptions{UseLayout: true},
+	)
+	if err != nil {
+		return err
 	}
 
 	if worktreeBackground {
@@ -276,14 +277,14 @@ func convertToBare(repoPath string) error {
 }
 
 // selectRepo presents an interactive list of repos + active sessions.
-func selectRepo(cfg *config.Config) (string, error) {
+func selectRepo(cfg *config.Config, set *mux.Set) (string, error) {
 	var (
 		sessions []string
 		allRepos []*repo.Repo
 		wg       sync.WaitGroup
 	)
 	wg.Add(2)
-	go func() { defer wg.Done(); sessions = sessionNames(multiplexer(cfg)) }()
+	go func() { defer wg.Done(); sessions = set.SessionNames() }()
 	go func() { defer wg.Done(); allRepos, _ = repo.FindAll(cfg.BaseDirs) }()
 	wg.Wait()
 

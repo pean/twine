@@ -40,6 +40,8 @@ type NewSessionOptions struct {
 type Multiplexer interface {
 	// Name is the backend's identifier, such as "tmux".
 	Name() string
+	// Available reports whether the backend can be used on this machine.
+	Available() bool
 	// Inside reports whether twine runs inside a session of this backend.
 	Inside() bool
 	// HasSession reports whether a session with exactly this name exists.

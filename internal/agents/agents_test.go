@@ -10,6 +10,7 @@ import (
 type fakeMux struct{}
 
 func (fakeMux) Name() string                         { return "fake" }
+func (fakeMux) Available() bool                      { return true }
 func (fakeMux) Inside() bool                         { return false }
 func (fakeMux) HasSession(string) bool               { return false }
 func (fakeMux) ListSessions() ([]mux.Session, error) { return nil, nil }

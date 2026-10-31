@@ -40,6 +40,12 @@ func New(opts Options) *Backend {
 // Name implements mux.Multiplexer.
 func (b *Backend) Name() string { return "tmux" }
 
+// Available implements mux.Multiplexer.
+func (b *Backend) Available() bool {
+	_, err := exec.LookPath("tmux")
+	return err == nil
+}
+
 // Inside implements mux.Multiplexer.
 func (b *Backend) Inside() bool { return os.Getenv("TMUX") != "" }
 

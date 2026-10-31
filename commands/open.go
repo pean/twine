@@ -105,21 +105,23 @@ func runOpen(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	mx := multiplexer(cfg)
-	var lastSession string
+	set, err := muxSet(cfg)
+	if err != nil {
+		return err
+	}
+	var (
+		last        mux.Multiplexer
+		lastSession string
+	)
 	for _, m := range matches {
-		if !mx.HasSession(m.sessionName) {
-			fmt.Printf("Creating %s session: %s\n", mx.Name(), m.sessionName)
-			sessionErr := mx.NewSession(
-				m.sessionName, m.worktreePath,
-				mux.NewSessionOptions{UseLayout: true},
-			)
-			if sessionErr != nil {
-				return fmt.Errorf("failed to create session %s: %w", m.sessionName, sessionErr)
-			}
+		mx, err := ensureSession(set, m.repoName, m.sessionName, m.worktreePath,
+			mux.NewSessionOptions{UseLayout: true},
+		)
+		if err != nil {
+			return fmt.Errorf("session %s: %w", m.sessionName, err)
 		}
-		lastSession = m.sessionName
+		last, lastSession = mx, m.sessionName
 	}
 
-	return mx.AttachOrSwitch(lastSession)
+	return last.AttachOrSwitch(lastSession)
 }

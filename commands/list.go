@@ -51,7 +51,11 @@ func allWorktreesWithSessions() ([]repo.WorktreeEntry, map[string]bool, error) {
 		return nil, nil, fmt.Errorf("failed to list worktrees: %w", err)
 	}
 
-	names := sessionNames(multiplexer(cfg))
+	set, err := muxSet(cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+	names := set.SessionNames()
 	sessions := make(map[string]bool, len(names))
 	prefix := cfg.SessionPrefix
 	for _, s := range names {
