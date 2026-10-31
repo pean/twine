@@ -10,7 +10,6 @@ import (
 	"github.com/pean/twine/internal/config"
 	"github.com/pean/twine/internal/git"
 	"github.com/pean/twine/internal/repo"
-	"github.com/pean/twine/internal/tmux"
 )
 
 var (
@@ -58,6 +57,7 @@ func runPrune(cmd *cobra.Command, args []string) error {
 		)
 	}
 
+	mx := multiplexer(cfg)
 	var repos []*repo.Repo
 
 	switch {
@@ -74,7 +74,7 @@ func runPrune(cmd *cobra.Command, args []string) error {
 		}
 	default:
 		// Only repos that have at least one active tmux session.
-		sessions, _ := tmux.ListSessions()
+		sessions := sessionNames(mx)
 		for _, name := range activeRepoNames(sessions, cfg.SessionPrefix) {
 			r, err := repo.Find(cfg.BaseDirs, name)
 			if err == nil {
@@ -136,7 +136,7 @@ func runPrune(cmd *cobra.Command, args []string) error {
 				if wtPath != "" {
 					fmt.Printf("  would remove worktree: %s\n", branch)
 				}
-				if tmux.HasSession(sessionName) {
+				if mx.HasSession(sessionName) {
 					fmt.Printf("  would kill session: %s\n", sessionName)
 				}
 				fmt.Printf("  would delete branch: %s\n", branch)
@@ -144,8 +144,8 @@ func runPrune(cmd *cobra.Command, args []string) error {
 				continue
 			}
 
-			if tmux.HasSession(sessionName) {
-				if err := tmux.KillSession(sessionName); err != nil {
+			if mx.HasSession(sessionName) {
+				if err := mx.KillSession(sessionName); err != nil {
 					fmt.Fprintf(
 						os.Stderr,
 						"  Warning: failed to kill session %s: %v\n",

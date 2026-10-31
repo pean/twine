@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -13,8 +12,8 @@ import (
 
 	"github.com/pean/twine/internal/config"
 	"github.com/pean/twine/internal/git"
+	"github.com/pean/twine/internal/mux"
 	"github.com/pean/twine/internal/repo"
-	"github.com/pean/twine/internal/tmux"
 	"github.com/pean/twine/internal/ui"
 )
 
@@ -41,11 +40,11 @@ func init() {
 	)
 }
 
-func attachOrSwitchUnlessBackground(name string) error {
+func attachOrSwitchUnlessBackground(m mux.Multiplexer, name string) error {
 	if sessionBackground {
 		return nil
 	}
-	return tmux.AttachOrSwitch(name)
+	return m.AttachOrSwitch(name)
 }
 
 func runSession(cmd *cobra.Command, args []string) error {
@@ -59,13 +58,15 @@ func runSession(cmd *cobra.Command, args []string) error {
 		)
 	}
 
+	m := multiplexer(cfg)
+
 	target := ""
 	if len(args) >= 1 {
 		target = args[0]
 	}
 
 	if target == "" {
-		chosen, err := selectSession(cfg)
+		chosen, err := selectSession(cfg, m)
 		if errors.Is(err, ui.ErrCancelled) {
 			return nil
 		}
@@ -83,26 +84,24 @@ func runSession(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("cannot resolve path: %w", err)
 		}
 		name := cfg.SessionPrefix + strings.TrimLeft(filepath.Base(dir), ".")
-		if !tmux.HasSession(name) {
-			if git.IsGitRepo(dir) && cfg.ShouldUseTmuxinator() {
-				if err := runTmuxinator(name, dir, cfg); err != nil {
-					return err
-				}
-			} else {
-				if err := tmux.NewSession(name, dir); err != nil &&
-					!strings.Contains(err.Error(), "duplicate session") {
-					return fmt.Errorf("failed to create session: %w", err)
-				}
+		if !m.HasSession(name) {
+			// Layouts only apply to git repos.
+			useLayout := git.IsGitRepo(dir)
+			err := m.NewSession(name, dir, mux.NewSessionOptions{
+				UseLayout: useLayout,
+			})
+			if err != nil && !errors.Is(err, mux.ErrSessionExists) {
+				return fmt.Errorf("failed to create session: %w", err)
 			}
 		}
-		return attachOrSwitchUnlessBackground(name)
+		return attachOrSwitchUnlessBackground(m, name)
 	}
 
 	// Try session names with and without prefix.
 	names := []string{cfg.SessionPrefix + target, target}
 	for _, name := range names {
-		if tmux.HasSession(name) {
-			return attachOrSwitchUnlessBackground(name)
+		if m.HasSession(name) {
+			return attachOrSwitchUnlessBackground(m, name)
 		}
 	}
 
@@ -124,39 +123,35 @@ func runSession(cmd *cobra.Command, args []string) error {
 				continue
 			}
 
-			if cfg.ShouldUseTmuxinator() {
-				if err := runTmuxinator(name, repoPath, cfg); err != nil {
-					return err
-				}
-			} else {
-				if err := tmux.NewSession(name, repoPath); err != nil {
-					return fmt.Errorf(
-						"failed to create session: %w", err,
-					)
-				}
+			err := m.NewSession(name, repoPath, mux.NewSessionOptions{
+				UseLayout: true,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to create session: %w", err)
 			}
-			return attachOrSwitchUnlessBackground(name)
+			return attachOrSwitchUnlessBackground(m, name)
 		}
 	}
 
 	// No repo found – create a basic session.
 	fallback := names[len(names)-1]
-	if !tmux.HasSession(fallback) {
-		if err := tmux.NewSession(fallback, "."); err != nil {
+	if !m.HasSession(fallback) {
+		err := m.NewSession(fallback, ".", mux.NewSessionOptions{})
+		if err != nil {
 			return fmt.Errorf("failed to create session: %w", err)
 		}
 	}
-	return attachOrSwitchUnlessBackground(fallback)
+	return attachOrSwitchUnlessBackground(m, fallback)
 }
 
-func selectSession(cfg *config.Config) (string, error) {
+func selectSession(cfg *config.Config, m mux.Multiplexer) (string, error) {
 	var (
 		sessions []string
 		allRepos []*repo.Repo
 		wg       sync.WaitGroup
 	)
 	wg.Add(2)
-	go func() { defer wg.Done(); sessions, _ = tmux.ListSessions() }()
+	go func() { defer wg.Done(); sessions = sessionNames(m) }()
 	go func() { defer wg.Done(); allRepos, _ = repo.FindAll(cfg.BaseDirs) }()
 	wg.Wait()
 
@@ -187,15 +182,4 @@ func selectSession(cfg *config.Config) (string, error) {
 func isDir(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.IsDir()
-}
-
-// runTmuxinator launches tmuxinator for a named session rooted at dir.
-func runTmuxinator(name, dir string, cfg *config.Config) error {
-	layout := "dev"
-	if cfg != nil && cfg.TmuxinatorLayout != "" {
-		layout = cfg.TmuxinatorLayout
-	}
-	c := exec.Command("tmuxinator", "start", "-n", name, layout, "false")
-	c.Dir = dir
-	return c.Run()
 }

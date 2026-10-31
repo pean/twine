@@ -10,7 +10,6 @@ import (
 
 	"github.com/pean/twine/internal/config"
 	"github.com/pean/twine/internal/repo"
-	"github.com/pean/twine/internal/tmux"
 	"github.com/pean/twine/internal/ui"
 )
 
@@ -40,13 +39,16 @@ func runKill(cmd *cobra.Command, args []string) error {
 	sessions := args
 	interactive := len(sessions) == 0
 
+	cfg, _ := config.Load()
+	mx := multiplexer(cfg)
+
 	if interactive {
-		all, err := tmux.ListSessionsFull()
+		all, err := mx.ListSessions()
 		if err != nil {
 			return fmt.Errorf("failed to list sessions: %w", err)
 		}
 		if len(all) == 0 {
-			fmt.Println("No tmux sessions running.")
+			fmt.Printf("No %s sessions running.\n", mx.Name())
 			return nil
 		}
 
@@ -84,10 +86,8 @@ func runKill(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	cfg, _ := config.Load()
-
 	for _, session := range sessions {
-		if err := tmux.KillSession(session); err != nil {
+		if err := mx.KillSession(session); err != nil {
 			fmt.Fprintf(os.Stderr,
 				"Warning: could not kill session %q: %v\n", session, err,
 			)

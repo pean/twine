@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/pean/twine/internal/agents"
-	"github.com/pean/twine/internal/tmux"
+	"github.com/pean/twine/internal/config"
 	"github.com/pean/twine/internal/ui"
 )
 
@@ -26,23 +26,26 @@ Select an agent to switch to its tmux session.`,
 }
 
 func runAgents(cmd *cobra.Command, args []string) error {
-	if !tmux.IsInsideTmux() {
-		sessions, _ := tmux.ListSessions()
-		if len(sessions) == 0 {
-			fmt.Fprintln(os.Stderr, "No tmux sessions found.")
+	cfg, _ := config.Load()
+	mx := multiplexer(cfg)
+
+	if !mx.Inside() {
+		if len(sessionNames(mx)) == 0 {
+			fmt.Fprintf(os.Stderr, "No %s sessions found.\n", mx.Name())
 			return nil
 		}
 	}
 
-	agentList, err := agents.FindAll()
+	agentList, err := agents.FindAll(mx)
 	if err != nil {
 		return fmt.Errorf("failed to discover agents: %w", err)
 	}
 
 	if len(agentList) == 0 {
-		fmt.Fprintln(
+		fmt.Fprintf(
 			os.Stderr,
-			"No AI coding agents found running in tmux sessions.",
+			"No AI coding agents found running in %s sessions.\n",
+			mx.Name(),
 		)
 		return nil
 	}
@@ -77,5 +80,5 @@ func runAgents(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return tmux.AttachOrSwitch(chosen.Value)
+	return mx.AttachOrSwitch(chosen.Value)
 }

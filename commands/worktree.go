@@ -13,8 +13,8 @@ import (
 
 	"github.com/pean/twine/internal/config"
 	"github.com/pean/twine/internal/git"
+	"github.com/pean/twine/internal/mux"
 	"github.com/pean/twine/internal/repo"
-	"github.com/pean/twine/internal/tmux"
 	"github.com/pean/twine/internal/ui"
 )
 
@@ -149,14 +149,13 @@ func runWorktree(cmd *cobra.Command, args []string) error {
 		fmt.Printf("✓ Worktree created: %s\n", branch)
 	}
 
-	// ---- create or switch tmux session ----
-	if !tmux.HasSession(sessionName) {
-		fmt.Printf("Creating tmux session: %s\n", sessionName)
-		if cfg.ShouldUseTmuxinator() {
-			err = runTmuxinator(sessionName, worktreePath, cfg)
-		} else {
-			err = tmux.NewSession(sessionName, worktreePath)
-		}
+	// ---- create or switch session ----
+	m := multiplexer(cfg)
+	if !m.HasSession(sessionName) {
+		fmt.Printf("Creating %s session: %s\n", m.Name(), sessionName)
+		err = m.NewSession(sessionName, worktreePath, mux.NewSessionOptions{
+			UseLayout: true,
+		})
 		if err != nil {
 			return fmt.Errorf("failed to create session: %w", err)
 		}
@@ -165,7 +164,7 @@ func runWorktree(cmd *cobra.Command, args []string) error {
 	if worktreeBackground {
 		return nil
 	}
-	return tmux.AttachOrSwitch(sessionName)
+	return m.AttachOrSwitch(sessionName)
 }
 
 // cloneBarPrompt asks the user for a git URL (or org/repo shorthand) and
@@ -284,7 +283,7 @@ func selectRepo(cfg *config.Config) (string, error) {
 		wg       sync.WaitGroup
 	)
 	wg.Add(2)
-	go func() { defer wg.Done(); sessions, _ = tmux.ListSessions() }()
+	go func() { defer wg.Done(); sessions = sessionNames(multiplexer(cfg)) }()
 	go func() { defer wg.Done(); allRepos, _ = repo.FindAll(cfg.BaseDirs) }()
 	wg.Wait()
 
