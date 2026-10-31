@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pean/twine/internal/tmux"
+	"github.com/pean/twine/internal/mux"
 )
 
 // AgentType identifies the AI coding agent.
@@ -45,16 +45,22 @@ type claudeSession struct {
 	Directory string `json:"directory"`
 }
 
-// FindAll discovers all running AI agents across Claude Code and OpenCode.
-func FindAll() ([]Agent, error) {
+// FindAll discovers all running AI agents across Claude Code and OpenCode in
+// the panes of m. Backends that cannot inspect panes yield no agents.
+func FindAll(m mux.Multiplexer) ([]Agent, error) {
+	inspector, ok := m.(mux.PaneInspector)
+	if !ok {
+		return nil, nil
+	}
+
 	var result []Agent
 
-	claude, err := findClaudeAgents()
+	claude, err := findClaudeAgents(inspector)
 	if err == nil {
 		result = append(result, claude...)
 	}
 
-	opencode, err := findOpenCodeAgents()
+	opencode, err := findOpenCodeAgents(inspector)
 	if err == nil {
 		result = append(result, opencode...)
 	}
@@ -62,7 +68,7 @@ func FindAll() ([]Agent, error) {
 	return result, nil
 }
 
-func findClaudeAgents() ([]Agent, error) {
+func findClaudeAgents(inspector mux.PaneInspector) ([]Agent, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
@@ -73,12 +79,12 @@ func findClaudeAgents() ([]Agent, error) {
 		return nil, nil
 	}
 
-	panes, err := tmux.ListPanes()
+	panes, err := inspector.ListPanes()
 	if err != nil {
 		return nil, err
 	}
 	// Build a set of pane PIDs for quick lookup.
-	panePIDs := make(map[int]tmux.PaneInfo, len(panes))
+	panePIDs := make(map[int]mux.Pane, len(panes))
 	for _, p := range panes {
 		panePIDs[p.PID] = p
 	}
@@ -111,7 +117,7 @@ func findClaudeAgents() ([]Agent, error) {
 			model = "unknown"
 		}
 
-		content, _ := tmux.CapturePaneContent(pane.PaneID, 10)
+		content, _ := inspector.CapturePane(pane.ID, 10)
 		state := detectClaudeState(content)
 
 		shortDir := shortenPath(dir, home)
@@ -121,19 +127,19 @@ func findClaudeAgents() ([]Agent, error) {
 			Session:   pane.Session,
 			Directory: shortDir,
 			Model:     model,
-			PaneID:    pane.PaneID,
+			PaneID:    pane.ID,
 		})
 	}
 	return result, nil
 }
 
 // walkToPanePID walks the PPID chain up to maxDepth levels from pid until it
-// finds a process whose PID matches a tmux pane_pid.
+// finds a process whose PID matches a pane's PID.
 func walkToPanePID(
 	pid int,
-	panePIDs map[int]tmux.PaneInfo,
+	panePIDs map[int]mux.Pane,
 	maxDepth int,
-) (tmux.PaneInfo, bool) {
+) (mux.Pane, bool) {
 	current := pid
 	for i := 0; i < maxDepth; i++ {
 		if pane, ok := panePIDs[current]; ok {
@@ -145,7 +151,7 @@ func walkToPanePID(
 		}
 		current = ppid
 	}
-	return tmux.PaneInfo{}, false
+	return mux.Pane{}, false
 }
 
 // ppidOf returns the parent PID of the given process using ps.
@@ -157,8 +163,8 @@ func ppidOf(pid int) (int, error) {
 	return strconv.Atoi(strings.TrimSpace(string(out)))
 }
 
-func findOpenCodeAgents() ([]Agent, error) {
-	panes, err := tmux.ListPanes()
+func findOpenCodeAgents(inspector mux.PaneInspector) ([]Agent, error) {
+	panes, err := inspector.ListPanes()
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +174,7 @@ func findOpenCodeAgents() ([]Agent, error) {
 		if !strings.EqualFold(p.Command, "opencode") {
 			continue
 		}
-		content, _ := tmux.CapturePaneContent(p.PaneID, 20)
+		content, _ := inspector.CapturePane(p.ID, 20)
 		state := detectOpenCodeState(content)
 		result = append(result, Agent{
 			Type:      AgentOpenCode,
@@ -176,7 +182,7 @@ func findOpenCodeAgents() ([]Agent, error) {
 			Session:   p.Session,
 			Directory: shortenPath(p.Path, home),
 			Model:     "-",
-			PaneID:    p.PaneID,
+			PaneID:    p.ID,
 		})
 	}
 	return result, nil

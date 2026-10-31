@@ -7,7 +7,6 @@ import (
 
 	"github.com/pean/twine/internal/config"
 	"github.com/pean/twine/internal/repo"
-	"github.com/pean/twine/internal/tmux"
 )
 
 var listCmd = &cobra.Command{
@@ -52,10 +51,14 @@ func allWorktreesWithSessions() ([]repo.WorktreeEntry, map[string]bool, error) {
 		return nil, nil, fmt.Errorf("failed to list worktrees: %w", err)
 	}
 
-	sessionNames, _ := tmux.ListSessions()
-	sessions := make(map[string]bool, len(sessionNames))
+	set, err := muxSet(cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+	names := set.SessionNames()
+	sessions := make(map[string]bool, len(names))
 	prefix := cfg.SessionPrefix
-	for _, s := range sessionNames {
+	for _, s := range names {
 		name := s
 		if prefix != "" {
 			name = stripPrefix(s, prefix)

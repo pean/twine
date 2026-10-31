@@ -13,8 +13,8 @@ import (
 
 	"github.com/pean/twine/internal/config"
 	"github.com/pean/twine/internal/git"
+	"github.com/pean/twine/internal/mux"
 	"github.com/pean/twine/internal/repo"
-	"github.com/pean/twine/internal/tmux"
 	"github.com/pean/twine/internal/ui"
 )
 
@@ -67,6 +67,11 @@ func runWorktree(cmd *cobra.Command, args []string) error {
 		)
 	}
 
+	set, err := muxSet(cfg)
+	if err != nil {
+		return err
+	}
+
 	repoName := ""
 	branch := ""
 	if len(args) >= 1 {
@@ -78,7 +83,7 @@ func runWorktree(cmd *cobra.Command, args []string) error {
 
 	// ---- repo selection ----
 	if repoName == "" {
-		name, err := selectRepo(cfg)
+		name, err := selectRepo(cfg, set)
 		if err != nil {
 			return err
 		}
@@ -149,23 +154,18 @@ func runWorktree(cmd *cobra.Command, args []string) error {
 		fmt.Printf("✓ Worktree created: %s\n", branch)
 	}
 
-	// ---- create or switch tmux session ----
-	if !tmux.HasSession(sessionName) {
-		fmt.Printf("Creating tmux session: %s\n", sessionName)
-		if cfg.ShouldUseTmuxinator() {
-			err = runTmuxinator(sessionName, worktreePath, cfg)
-		} else {
-			err = tmux.NewSession(sessionName, worktreePath)
-		}
-		if err != nil {
-			return fmt.Errorf("failed to create session: %w", err)
-		}
+	// ---- create or switch session ----
+	m, err := ensureSession(set, repoName, sessionName, worktreePath,
+		mux.NewSessionOptions{UseLayout: true},
+	)
+	if err != nil {
+		return err
 	}
 
 	if worktreeBackground {
 		return nil
 	}
-	return tmux.AttachOrSwitch(sessionName)
+	return m.AttachOrSwitch(sessionName)
 }
 
 // cloneBarPrompt asks the user for a git URL (or org/repo shorthand) and
@@ -277,14 +277,14 @@ func convertToBare(repoPath string) error {
 }
 
 // selectRepo presents an interactive list of repos + active sessions.
-func selectRepo(cfg *config.Config) (string, error) {
+func selectRepo(cfg *config.Config, set *mux.Set) (string, error) {
 	var (
 		sessions []string
 		allRepos []*repo.Repo
 		wg       sync.WaitGroup
 	)
 	wg.Add(2)
-	go func() { defer wg.Done(); sessions, _ = tmux.ListSessions() }()
+	go func() { defer wg.Done(); sessions = set.SessionNames() }()
 	go func() { defer wg.Done(); allRepos, _ = repo.FindAll(cfg.BaseDirs) }()
 	wg.Wait()
 

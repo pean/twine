@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/pean/twine/internal/config"
-	"github.com/pean/twine/internal/tmux"
+	"github.com/pean/twine/internal/mux"
 )
 
 // matchWorktree reports whether the "repo/branch" candidate matches pattern.
@@ -105,22 +105,23 @@ func runOpen(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	var lastSession string
+	set, err := muxSet(cfg)
+	if err != nil {
+		return err
+	}
+	var (
+		last        mux.Multiplexer
+		lastSession string
+	)
 	for _, m := range matches {
-		if !tmux.HasSession(m.sessionName) {
-			fmt.Printf("Creating tmux session: %s\n", m.sessionName)
-			var sessionErr error
-			if cfg.ShouldUseTmuxinator() {
-				sessionErr = runTmuxinator(m.sessionName, m.worktreePath, cfg)
-			} else {
-				sessionErr = tmux.NewSession(m.sessionName, m.worktreePath)
-			}
-			if sessionErr != nil {
-				return fmt.Errorf("failed to create session %s: %w", m.sessionName, sessionErr)
-			}
+		mx, err := ensureSession(set, m.repoName, m.sessionName, m.worktreePath,
+			mux.NewSessionOptions{UseLayout: true},
+		)
+		if err != nil {
+			return fmt.Errorf("session %s: %w", m.sessionName, err)
 		}
-		lastSession = m.sessionName
+		last, lastSession = mx, m.sessionName
 	}
 
-	return tmux.AttachOrSwitch(lastSession)
+	return last.AttachOrSwitch(lastSession)
 }

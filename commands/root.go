@@ -4,12 +4,19 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"github.com/pean/twine/internal/config"
 )
 
 var rootCmd = &cobra.Command{
 	Use:   "twine",
-	Short: "Git worktree + tmux session management",
-	Long:  `Twine manages git worktrees and tmux sessions together.`,
+	Short: "Git worktree + terminal multiplexer session management",
+	Long: `Twine manages git worktrees and multiplexer sessions together.
+
+New sessions go to the multiplexer chosen by, in order: --mux, the
+TWINE_MUX environment variable, a matching [[repos]] entry in the config,
+and the top-level multiplexer setting ("auto" by default). Existing
+sessions are found in every installed multiplexer unless --mux is given.`,
 	CompletionOptions: cobra.CompletionOptions{
 		DisableDefaultCmd: true,
 	},
@@ -23,6 +30,15 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.PersistentFlags().StringVar(
+		&muxFlag, "mux", "",
+		"multiplexer to use, ignoring all others: auto, tmux, or rex",
+	)
+	_ = rootCmd.RegisterFlagCompletionFunc(
+		"mux",
+		cobra.FixedCompletions(config.Multiplexers, cobra.ShellCompDirectiveNoFileComp),
+	)
+
 	rootCmd.AddCommand(worktreeCmd)
 	rootCmd.AddCommand(sessionCmd)
 	rootCmd.AddCommand(pruneCmd)

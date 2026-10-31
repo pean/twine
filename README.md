@@ -71,8 +71,16 @@ base_dirs = [
   "~/src/personal",
 ]
 
-# Prefix prepended to all tmux session names (optional).
+# Prefix prepended to all session names (optional).
 # session_prefix = ""
+
+# Terminal multiplexer for new sessions (optional): auto | tmux | rex.
+# multiplexer = "auto"
+
+# Per-repository overrides (optional). The first matching entry wins.
+# [[repos]]
+# match = "work-*"         # repo name or glob
+# multiplexer = "rex"
 
 # Tmuxinator integration (optional).
 # use_tmuxinator = "auto"  # auto | true | false
@@ -81,6 +89,29 @@ base_dirs = [
 
 `use_tmuxinator = "auto"` (the default) uses tmuxinator when it is installed
 and `tmuxinator_layout` is set.
+
+### Choosing a multiplexer
+
+Twine drives a terminal multiplexer through a backend. tmux is supported
+today; [rex](https://www.superlogical.com/rex/docs) support is in progress
+and selecting it currently reports that it is not supported yet.
+
+New sessions go to the first of these that is set:
+
+1. `--mux <name>` on the command line. This is strict: only that
+   multiplexer is used, also when looking for existing sessions.
+2. `TWINE_MUX` in the environment, e.g. `set -gx TWINE_MUX tmux` in fish to
+   pick a default for one shell.
+3. The first matching `[[repos]]` entry in the config.
+4. The top-level `multiplexer` setting.
+
+`auto` (the default) picks the multiplexer twine is running inside, otherwise
+the first installed one (tmux, then rex).
+
+Without `--mux`, existing sessions are found in every installed multiplexer,
+so `ts my-project` switches to `my-project` wherever it runs, and `list`,
+`kill`, `prune`, and `agents` cover all of them. When more than one
+multiplexer is installed, session lists show which one runs each session.
 
 ## Commands
 
