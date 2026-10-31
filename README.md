@@ -26,7 +26,7 @@ Twine makes it easy to work on multiple branches simultaneously by pairing git w
 
 ## Requirements
 
-- [tmux](https://github.com/tmux/tmux)
+- [tmux](https://github.com/tmux/tmux) or [rex](https://www.superlogical.com/rex/docs)
 - [git](https://git-scm.com/) (with worktree support, git 2.5+)
 
 **Optional:**
@@ -92,9 +92,8 @@ and `tmuxinator_layout` is set.
 
 ### Choosing a multiplexer
 
-Twine drives a terminal multiplexer through a backend. tmux is supported
-today; [rex](https://www.superlogical.com/rex/docs) support is in progress
-and selecting it currently reports that it is not supported yet.
+Twine drives a terminal multiplexer through a backend: tmux or
+[rex](https://www.superlogical.com/rex/docs).
 
 New sessions go to the first of these that is set:
 
@@ -112,6 +111,16 @@ Without `--mux`, existing sessions are found in every installed multiplexer,
 so `ts my-project` switches to `my-project` wherever it runs, and `list`,
 `kill`, `prune`, and `agents` cover all of them. When more than one
 multiplexer is installed, session lists show which one runs each session.
+
+#### Rex
+
+Sessions are labelled `<prefix><repo>/<branch>`, as in tmux. Rex has no terminal
+attach, so switching asks the Rex app to show the session. The app only accepts that
+when **Remote Control** is on in its settings (Rex Server). Without it, twine still
+creates the session and prints the setting to turn on.
+
+Layouts (`tmuxinator_layout`) and the `agents` dashboard are tmux-only for now.
+`rex` must be on `PATH`; Rex adds it inside its own terminals.
 
 ## Commands
 

@@ -61,9 +61,12 @@ func runKill(cmd *cobra.Command, args []string) error {
 
 		items := make([]ui.Item, 0, len(all))
 		for i, s := range all {
+			title := s.Name + muxLabel(set, s.Backend)
+			if s.Path != "" {
+				title += fmt.Sprintf("  %s  %dw", s.Path, s.Windows)
+			}
 			items = append(items, ui.Item{
-				Title: fmt.Sprintf("%s%s  %s  %dw",
-					s.Name, muxLabel(set, s.Backend), s.Path, s.Windows),
+				Title:  title,
 				Value:  strconv.Itoa(i),
 				Active: true,
 			})

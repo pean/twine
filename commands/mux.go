@@ -7,6 +7,7 @@ import (
 
 	"github.com/pean/twine/internal/config"
 	"github.com/pean/twine/internal/mux"
+	"github.com/pean/twine/internal/mux/rex"
 	"github.com/pean/twine/internal/mux/tmux"
 )
 
@@ -26,7 +27,7 @@ func backends(cfg *config.Config) []mux.Multiplexer {
 		opts.UseTmuxinator = cfg.ShouldUseTmuxinator()
 		opts.TmuxinatorLayout = cfg.TmuxinatorLayout
 	}
-	return []mux.Multiplexer{tmux.New(opts)}
+	return []mux.Multiplexer{tmux.New(opts), rex.New()}
 }
 
 // muxSet returns the backends for cfg with the selection rules applied:
