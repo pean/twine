@@ -195,6 +195,7 @@ func runTmuxinator(name, dir string, cfg *config.Config) error {
 	if cfg != nil && cfg.TmuxinatorLayout != "" {
 		layout = cfg.TmuxinatorLayout
 	}
+	defer tmux.EnsureServer()()
 	c := exec.Command("tmuxinator", "start", "-n", name, layout, "false")
 	c.Dir = dir
 	return c.Run()

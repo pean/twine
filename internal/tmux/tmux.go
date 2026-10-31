@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -91,8 +92,46 @@ func ListSessionsFull() ([]SessionInfo, error) {
 	return result, nil
 }
 
+// EnsureServer starts the tmux server from the home directory when none is
+// running. The server keeps the working directory of the command that started
+// it, and if that directory is later removed (e.g. a pruned worktree) every new
+// pane ends up in the deleted directory. Call the returned func once a session
+// exists.
+func EnsureServer() func() {
+	if exec.Command("tmux", "list-sessions").Run() == nil {
+		return func() {}
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return func() {}
+	}
+	// A server without sessions exits right away, so hold it open with
+	// exit-empty until the caller has created one.
+	cmd := exec.Command(
+		"tmux", "start-server", ";",
+		"show-options", "-gv", "exit-empty", ";",
+		"set-option", "-g", "exit-empty", "off",
+	)
+	cmd.Dir = home
+	out, err := cmd.Output()
+	if err != nil {
+		return func() {}
+	}
+	prev := strings.TrimSpace(string(out))
+	if prev == "" || prev == "off" {
+		return func() {}
+	}
+	return func() {
+		_ = exec.Command("tmux", "set-option", "-g", "exit-empty", prev).Run()
+	}
+}
+
 // NewSession creates a detached tmux session named name in dir.
 func NewSession(name, dir string) error {
+	if abs, err := filepath.Abs(dir); err == nil {
+		dir = abs
+	}
+	defer EnsureServer()()
 	cmd := exec.Command("tmux", "new-session", "-d", "-s", name, "-c", dir)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
