@@ -43,6 +43,7 @@ func init() {
 	rootCmd.AddCommand(sessionCmd)
 	rootCmd.AddCommand(pruneCmd)
 	rootCmd.AddCommand(agentsCmd)
+	rootCmd.AddCommand(watchCmd)
 	rootCmd.AddCommand(killCmd)
 	rootCmd.AddCommand(installCmd)
 	rootCmd.AddCommand(openCmd)

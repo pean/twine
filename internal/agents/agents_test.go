@@ -106,3 +106,23 @@ func TestFindOpenCodeAgentsPrefersReportedStatus(t *testing.T) {
 		t.Errorf("findOpenCodeAgents() = %+v, want state %q", got, StateInput)
 	}
 }
+
+func TestFindOpenCodeAgentsByReportedApp(t *testing.T) {
+	inspector := fakeInspector{
+		panes: []mux.Pane{
+			// Started through a wrapper, so the process name is not opencode.
+			{
+				Session: "wrapped", Command: "bun", ID: "%1",
+				Status: &mux.PaneStatus{State: "working", App: "opencode"},
+			},
+			{
+				Session: "other", Command: "bun", ID: "%2",
+				Status: &mux.PaneStatus{State: "working", App: "cargo"},
+			},
+		},
+	}
+	got, _ := findOpenCodeAgents(inspector)
+	if len(got) != 1 || got[0].Session != "wrapped" || got[0].State != StateWorking {
+		t.Errorf("findOpenCodeAgents() = %+v, want only the wrapped agent", got)
+	}
+}

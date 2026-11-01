@@ -28,6 +28,26 @@ with --mux). Select an agent to switch to its session.`,
 	RunE: runAgents,
 }
 
+type foundAgent struct {
+	agent   agents.Agent
+	backend mux.Multiplexer
+}
+
+// discoverAgents finds the running agents in every searched backend.
+func discoverAgents(set *mux.Set) ([]foundAgent, error) {
+	var all []foundAgent
+	for _, b := range set.Backends("") {
+		list, err := agents.FindAll(b)
+		if err != nil {
+			return nil, fmt.Errorf("failed to discover agents in %s: %w", b.Name(), err)
+		}
+		for _, a := range list {
+			all = append(all, foundAgent{agent: a, backend: b})
+		}
+	}
+	return all, nil
+}
+
 func runAgents(cmd *cobra.Command, args []string) error {
 	cfg, _ := config.Load()
 	set, err := muxSet(cfg)
@@ -35,19 +55,9 @@ func runAgents(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	type found struct {
-		agent   agents.Agent
-		backend mux.Multiplexer
-	}
-	var all []found
-	for _, b := range set.Backends("") {
-		list, err := agents.FindAll(b)
-		if err != nil {
-			return fmt.Errorf("failed to discover agents in %s: %w", b.Name(), err)
-		}
-		for _, a := range list {
-			all = append(all, found{agent: a, backend: b})
-		}
+	all, err := discoverAgents(set)
+	if err != nil {
+		return err
 	}
 
 	if len(all) == 0 {

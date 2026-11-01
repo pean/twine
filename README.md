@@ -14,6 +14,7 @@ Available Commands:
   kill        Kill tmux sessions with optional worktree removal
   prune       Clean up gone branches, worktrees, and sessions
   session     Switch to a tmux session (faster, no branch selection)
+  watch       Notify when an AI coding agent needs input or finishes
   worktree    Create worktree and switch tmux session
 
 Flags:
@@ -216,6 +217,19 @@ Bind it to a tmux key for quick access — add to `~/.tmux.conf`:
 ```tmux
 bind-key a display-popup -E -w 90% -h 90% "twine agents"
 ```
+
+### `twine watch`
+
+Watches the agents in every multiplexer and shows a desktop notification when one
+needs input or finishes. Runs until interrupted, so start it in a spare pane.
+
+```sh
+twine watch                     # check every 3s
+twine watch --interval 10s
+```
+
+A new state has to show up on two checks in a row, so a screen that flickers does
+not notify. Notifications use `osascript` on macOS and `notify-send` on Linux.
 
 ## How it works
 

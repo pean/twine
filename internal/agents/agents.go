@@ -174,7 +174,8 @@ func findOpenCodeAgents(inspector mux.PaneInspector) ([]Agent, error) {
 	home, _ := os.UserHomeDir()
 	var result []Agent
 	for _, p := range panes {
-		if !strings.EqualFold(p.Command, "opencode") {
+		reported := p.Status != nil && p.Status.App == "opencode"
+		if !reported && !strings.EqualFold(p.Command, "opencode") {
 			continue
 		}
 		state, ok := stateFromStatus(p.Status, "opencode")
