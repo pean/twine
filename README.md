@@ -58,7 +58,7 @@ twine install
 
 ## Configuration
 
-Twine reads `~/.config/twine/config.toml`. The `twine install` command will create it for you, or write it manually:
+Twine reads `~/.config/twine/config.toml`. The `twine install` command will create it for you, or write it manually. [`config.example.toml`](config.example.toml) sets every option with comments; a test keeps it complete.
 
 ```toml
 # ~/.config/twine/config.toml

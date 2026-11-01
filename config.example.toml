@@ -1,0 +1,73 @@
+# Complete example of ~/.config/twine/config.toml
+#
+# Every option twine supports is set below. Copy it and remove what you do not
+# need: only base_dirs is required. A test keeps this file valid and complete.
+
+# Directories searched for repositories (required). ~ is expanded.
+base_dirs = [
+  "~/src/work",
+  "~/src/personal",
+]
+
+# Prefix added to every session name, so "dev-" gives "dev-my-project/main".
+# Default: none.
+session_prefix = "dev-"
+
+# Which multiplexer creates new sessions: auto, tmux, or rex. Default: auto.
+#
+# "auto" uses the multiplexer twine runs inside, otherwise the first installed
+# one (tmux, then rex). This sets the default for new sessions. The first of
+# these that is set wins:
+#   1. --mux <name> on the command line (also limits lookups to that one)
+#   2. TWINE_MUX in the environment
+#   3. a matching [[repos]] entry below
+#   4. this setting
+# Existing sessions are always found in every installed multiplexer, unless
+# --mux is given.
+multiplexer = "auto"
+
+# Layout new sessions start with, one of the names under [layouts] below.
+# Default: none, which gives a single shell.
+layout = "dev"
+
+# Layouts: the windows and panes a new session starts with. They work the same
+# in tmux and rex. Every window needs at least one pane.
+#
+# Each pane after the first splits the pane before it:
+#   split  left, right, above, or below. Default: right.
+#   size   the new pane's share of the pane it splits, 1-99 percent.
+#          Default: 50.
+#   command  typed into the pane's shell, which stays open after it.
+#          Default: none.
+# The first pane of a window cannot set split or size.
+[layouts.dev]
+windows = [
+  { name = "editor", panes = [
+      { command = "nvim" },
+      { split = "left", size = 40, command = "bin/rails console" },
+      { split = "below", size = 66, command = "git diff" },
+      { split = "below", size = 50, command = "git status" },
+  ]},
+  { name = "server", panes = [{ command = "bin/dev" }] },
+]
+
+# A layout can be as small as one window with two panes.
+[layouts.review]
+windows = [
+  { name = "review", panes = [
+      { command = "git log --oneline -20" },
+      { split = "right", size = 60 },
+  ]},
+]
+
+# Per-repository overrides. match is a repository name or a glob. The first
+# matching entry that sets a value wins; anything it leaves out falls back to
+# the top-level setting.
+[[repos]]
+match = "work-*"
+multiplexer = "rex"
+layout = "review"
+
+[[repos]]
+match = "notes"
+multiplexer = "tmux"

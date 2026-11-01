@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -262,4 +263,93 @@ func TestLoad_tmuxinatorKeysAreRejected(t *testing.T) {
 			}
 		})
 	}
+}
+
+const examplePath = "../../config.example.toml"
+
+func TestExampleConfigIsValid(t *testing.T) {
+	data, err := os.ReadFile(examplePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeConfig(t, home, string(data))
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("example config does not load: %v", err)
+	}
+	if cfg.Layout != "dev" || len(cfg.Layouts) != 2 || len(cfg.Repos) != 2 {
+		t.Errorf("unexpected example contents: %+v", cfg)
+	}
+	if got := cfg.MultiplexerFor("work-api"); got != "rex" {
+		t.Errorf("MultiplexerFor(work-api) = %q, want rex", got)
+	}
+	if l := cfg.LayoutFor("work-api"); l == nil || l.Windows[0].Name != "review" {
+		t.Errorf("LayoutFor(work-api) = %+v, want the review layout", l)
+	}
+}
+
+// Every option twine reads must be set in the example, so adding one without
+// documenting it fails here.
+func TestExampleConfigSetsEveryOption(t *testing.T) {
+	data, err := os.ReadFile(examplePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeConfig(t, home, string(data))
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	set := map[string]bool{}
+	recordSetFields(reflect.ValueOf(*cfg), set)
+	for _, field := range allFields(reflect.TypeOf(Config{})) {
+		if !set[field] {
+			t.Errorf("config.example.toml does not set %s", field)
+		}
+	}
+}
+
+// recordSetFields records "Type.Field" for every non-zero struct field
+// reachable from v.
+func recordSetFields(v reflect.Value, set map[string]bool) {
+	switch v.Kind() {
+	case reflect.Slice:
+		for i := 0; i < v.Len(); i++ {
+			recordSetFields(v.Index(i), set)
+		}
+	case reflect.Map:
+		for _, key := range v.MapKeys() {
+			recordSetFields(v.MapIndex(key), set)
+		}
+	case reflect.Struct:
+		for i := 0; i < v.NumField(); i++ {
+			if !v.Field(i).IsZero() {
+				set[v.Type().Name()+"."+v.Type().Field(i).Name] = true
+			}
+			recordSetFields(v.Field(i), set)
+		}
+	}
+}
+
+// allFields lists "Type.Field" for every struct field reachable from t.
+func allFields(t reflect.Type) []string {
+	for t.Kind() == reflect.Slice || t.Kind() == reflect.Map {
+		t = t.Elem()
+	}
+	if t.Kind() != reflect.Struct {
+		return nil
+	}
+	var fields []string
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		fields = append(fields, t.Name()+"."+f.Name)
+		fields = append(fields, allFields(f.Type)...)
+	}
+	return fields
 }
