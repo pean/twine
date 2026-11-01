@@ -218,6 +218,14 @@ Bind it to a tmux key for quick access — add to `~/.tmux.conf`:
 bind-key a display-popup -E -w 90% -h 90% "twine agents"
 ```
 
+In Rex, `twine install` writes `twine_agents`, an action that opens the dashboard
+in a floating pane. It does not edit your `init.lua`; add the two lines it prints:
+
+```lua
+require("twine")
+rex.bind("ctrl+b>a", "twine_agents")
+```
+
 ### `twine watch`
 
 Watches the agents in every multiplexer and shows a desktop notification when one

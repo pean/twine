@@ -2,6 +2,7 @@ package commands
 
 import (
 	"bytes"
+	_ "embed"
 	"errors"
 	"fmt"
 	"os"
@@ -11,8 +12,12 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/pean/twine/internal/config"
+	"github.com/pean/twine/internal/mux/rex"
 	"github.com/pean/twine/internal/ui"
 )
+
+//go:embed twine.lua
+var rexModule []byte
 
 const aliasBlock = `# Twine aliases
 alias tw='twine worktree'
@@ -37,6 +42,12 @@ func runInstall(_ *cobra.Command, _ []string) error {
 		{Title: "Aliases  (tw, ts, tk)", Value: "aliases"},
 		{Title: "Completions  (" + shell + ")", Value: "completions"},
 	}
+	if rex.New().Available() {
+		items = append(items, ui.Item{
+			Title: "Rex  (floating agents pane action, " + rexModulePath() + ")",
+			Value: "rex",
+		})
+	}
 	chosen, err := ui.MultiSelect(items, "Select what to install:")
 	if errors.Is(err, ui.ErrCancelled) || len(chosen) == 0 {
 		fmt.Println("Nothing installed.")
@@ -58,6 +69,10 @@ func runInstall(_ *cobra.Command, _ []string) error {
 			}
 		case "completions":
 			if err := installCompletions(shell); err != nil {
+				return err
+			}
+		case "rex":
+			if err := installRex(); err != nil {
 				return err
 			}
 		}
@@ -196,4 +211,66 @@ func shellCompletionPath(home, shell string) (dir, file, note string) {
 		return filepath.Join(home, ".local", "share", "bash-completion", "completions"),
 			"twine", ""
 	}
+}
+
+// rexConfigDir returns the directory holding Rex's init.lua, following the
+// lookup Rex documents: REX_CONFIG, then XDG_CONFIG_HOME, then ~/.config.
+func rexConfigDir(getenv func(string) string, home string) string {
+	if file := getenv("REX_CONFIG"); file != "" {
+		return filepath.Dir(file)
+	}
+	if xdg := getenv("XDG_CONFIG_HOME"); xdg != "" {
+		return filepath.Join(xdg, "rex")
+	}
+	return filepath.Join(home, ".config", "rex")
+}
+
+func rexModulePath() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(rexConfigDir(os.Getenv, home), "twine.lua")
+}
+
+// writeRexModule writes twine.lua into dir unless a file is already there.
+// It returns false when it left an existing file alone.
+func writeRexModule(dir string) (bool, error) {
+	path := filepath.Join(dir, "twine.lua")
+	if _, err := os.Stat(path); err == nil {
+		return false, nil
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return false, fmt.Errorf("could not create %s: %w", dir, err)
+	}
+	if err := os.WriteFile(path, rexModule, 0o644); err != nil {
+		return false, fmt.Errorf("failed to write %s: %w", path, err)
+	}
+	return true, nil
+}
+
+// installRex adds the twine_agents action for Rex. It does not edit init.lua;
+// it prints the lines to add.
+func installRex() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	dir := rexConfigDir(os.Getenv, home)
+	wrote, err := writeRexModule(dir)
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(dir, "twine.lua")
+	if wrote {
+		fmt.Printf("✓ Rex action written to %s\n", path)
+	} else {
+		fmt.Printf("Rex action already exists: %s\n", path)
+	}
+
+	initLua, _ := os.ReadFile(filepath.Join(dir, "init.lua"))
+	if strings.Contains(string(initLua), `require("twine")`) {
+		return nil
+	}
+	fmt.Println("  Add to init.lua, then run `rex config reload`:")
+	fmt.Println(`    require("twine")`)
+	fmt.Println(`    rex.bind("ctrl+b>a", "twine_agents")`)
+	return nil
 }
