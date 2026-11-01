@@ -29,9 +29,6 @@ Twine makes it easy to work on multiple branches simultaneously by pairing git w
 - [tmux](https://github.com/tmux/tmux) or [rex](https://www.superlogical.com/rex/docs)
 - [git](https://git-scm.com/) (with worktree support, git 2.5+)
 
-**Optional:**
-- [tmuxinator](https://github.com/tmuxinator/tmuxinator) — for custom session layouts
-
 ## Installation
 
 ### Go install
@@ -77,18 +74,47 @@ base_dirs = [
 # Terminal multiplexer for new sessions (optional): auto | tmux | rex.
 # multiplexer = "auto"
 
+# Layout new sessions start with (optional), defined under [layouts].
+# layout = "dev"
+
 # Per-repository overrides (optional). The first matching entry wins.
 # [[repos]]
 # match = "work-*"         # repo name or glob
 # multiplexer = "rex"
-
-# Tmuxinator integration (optional).
-# use_tmuxinator = "auto"  # auto | true | false
-# tmuxinator_layout = "dev"
+# layout = "dev"
 ```
 
-`use_tmuxinator = "auto"` (the default) uses tmuxinator when it is installed
-and `tmuxinator_layout` is set.
+### Layouts
+
+A layout is the windows and panes a new session starts with. It works the same
+in tmux and rex.
+
+```toml
+layout = "dev"
+
+[layouts.dev]
+windows = [
+  { name = "editor", panes = [
+      { command = "nvim" },
+      { split = "left", size = 40, command = "bin/rails console" },
+      { split = "below", size = 66, command = "git diff" },
+      { split = "below", size = 50, command = "git status" },
+  ]},
+  { name = "server", panes = [{ command = "ls" }] },
+]
+```
+
+Each pane after the first splits the pane before it. `split` is `left`, `right`,
+`above`, or `below` (default `right`), and `size` is the new pane's share of the
+pane it splits, in percent (default 50). `command` is typed into the pane's shell,
+which stays open after it. The first pane of the first window is selected.
+
+Set `layout` at the top level for all repos, or per repo in `[[repos]]`. Sessions
+without a layout get a single shell.
+
+Tmuxinator is no longer supported. `use_tmuxinator` and `tmuxinator_layout` now
+fail with an error that points here. A tmuxinator `on_project_start` hook has no
+layout equivalent; put the command in a pane, e.g. `command = "mise install; nvim"`.
 
 ### Choosing a multiplexer
 
@@ -121,8 +147,7 @@ creates the session and prints the setting to turn on.
 
 `twine agents` reads each agent's own status from Rex (Claude Code reports
 `working`, `blocked`, and so on), so it does not read the screen unless an agent
-reports nothing. Layouts (`tmuxinator_layout`) are tmux-only for now.
-`rex` must be on `PATH`; Rex adds it inside its own terminals.
+reports nothing. `rex` must be on `PATH`; Rex adds it inside its own terminals.
 
 ## Commands
 

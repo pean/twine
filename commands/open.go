@@ -115,7 +115,7 @@ func runOpen(cmd *cobra.Command, args []string) error {
 	)
 	for _, m := range matches {
 		mx, err := ensureSession(set, m.repoName, m.sessionName, m.worktreePath,
-			mux.NewSessionOptions{UseLayout: true},
+			mux.NewSessionOptions{Layout: cfg.LayoutFor(m.repoName)},
 		)
 		if err != nil {
 			return fmt.Errorf("session %s: %w", m.sessionName, err)

@@ -156,7 +156,7 @@ func runWorktree(cmd *cobra.Command, args []string) error {
 
 	// ---- create or switch session ----
 	m, err := ensureSession(set, repoName, sessionName, worktreePath,
-		mux.NewSessionOptions{UseLayout: true},
+		mux.NewSessionOptions{Layout: cfg.LayoutFor(repoName)},
 	)
 	if err != nil {
 		return err

@@ -42,10 +42,9 @@ type PaneStatus struct {
 
 // NewSessionOptions controls how a session is created.
 type NewSessionOptions struct {
-	// UseLayout applies the backend's configured layout (for example a
-	// tmuxinator project) when one is configured. When false, or when no
-	// layout is configured, a plain session with one shell is created.
-	UseLayout bool
+	// Layout is the windows and panes to start with. Nil creates a plain
+	// session with one shell.
+	Layout *Layout
 }
 
 // Multiplexer is the session lifecycle every backend supports.

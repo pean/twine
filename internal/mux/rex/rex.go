@@ -109,7 +109,7 @@ func (b *Backend) ListSessions() ([]mux.Session, error) {
 // name is checked first.
 func (b *Backend) NewSession(
 	name, dir string,
-	_ mux.NewSessionOptions,
+	opts mux.NewSessionOptions,
 ) error {
 	if b.HasSession(name) {
 		return fmt.Errorf("%w: %s", mux.ErrSessionExists, name)
@@ -117,6 +117,9 @@ func (b *Backend) NewSession(
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return err
+	}
+	if opts.Layout != nil && len(opts.Layout.Windows) > 0 {
+		return b.createWithLayout(name, abs, *opts.Layout)
 	}
 	_, err = b.run("new", name, "--cwd", abs)
 	return err

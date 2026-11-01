@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -54,21 +55,6 @@ func TestLoad_tildeExpansion(t *testing.T) {
 	}
 }
 
-func TestLoad_defaultsUseTmuxinator(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-
-	writeConfig(t, home, `base_dirs = ["/tmp"]`)
-
-	cfg, err := Load()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if cfg.UseTmuxinator != "auto" {
-		t.Errorf("expected default use_tmuxinator=auto, got %q", cfg.UseTmuxinator)
-	}
-}
-
 func TestLoad_missingFile(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -76,13 +62,6 @@ func TestLoad_missingFile(t *testing.T) {
 	_, err := Load()
 	if err == nil {
 		t.Fatal("expected error for missing config file")
-	}
-}
-
-func TestShouldUseTmuxinator_false(t *testing.T) {
-	cfg := &Config{UseTmuxinator: "false"}
-	if cfg.ShouldUseTmuxinator() {
-		t.Error("expected false")
 	}
 }
 
@@ -163,6 +142,123 @@ multiplexer = "tmux"`,
 			writeConfig(t, home, content)
 			if _, err := Load(); err == nil {
 				t.Error("expected an error")
+			}
+		})
+	}
+}
+
+const layoutConfig = `
+base_dirs = ["/tmp"]
+layout = "dev"
+
+[layouts.dev]
+windows = [
+  { name = "code", panes = [
+      { command = "nvim" },
+      { split = "below", size = 25 },
+  ]},
+]
+
+[layouts.plain]
+windows = [{ panes = [{}] }]
+
+[[repos]]
+match = "work-*"
+layout = "plain"
+
+[[repos]]
+match = "notes"
+multiplexer = "tmux"
+`
+
+func TestLayoutFor(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeConfig(t, home, layoutConfig)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	dev := cfg.LayoutFor("personal")
+	if dev == nil || len(dev.Windows) != 1 || dev.Windows[0].Name != "code" {
+		t.Fatalf("LayoutFor(personal) = %+v, want the dev layout", dev)
+	}
+	if p := dev.Windows[0].Panes[1]; p.Split != "below" || p.Size != 25 {
+		t.Errorf("second pane = %+v", p)
+	}
+	if got := cfg.LayoutFor("work-api"); got == nil || got.Windows[0].Name != "" {
+		t.Errorf("LayoutFor(work-api) = %+v, want the plain layout", got)
+	}
+	// A matching entry without a layout falls back to the top-level one.
+	if got := cfg.LayoutFor("notes"); got == nil || got.Windows[0].Name != "code" {
+		t.Errorf("LayoutFor(notes) = %+v, want the dev layout", got)
+	}
+}
+
+func TestLayoutFor_noneConfigured(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeConfig(t, home, `base_dirs = ["/tmp"]`)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := cfg.LayoutFor("anything"); got != nil {
+		t.Errorf("LayoutFor() = %+v, want nil", got)
+	}
+}
+
+func TestLoad_invalidLayouts(t *testing.T) {
+	cases := map[string]string{
+		"unknown top-level": `base_dirs = ["/tmp"]
+layout = "missing"`,
+		"unknown per-repo": `base_dirs = ["/tmp"]
+[[repos]]
+match = "x"
+layout = "missing"`,
+		"no panes": `base_dirs = ["/tmp"]
+[layouts.a]
+windows = [{ name = "w", panes = [] }]`,
+		"no windows": `base_dirs = ["/tmp"]
+[layouts.a]
+windows = []`,
+		"bad split": `base_dirs = ["/tmp"]
+[layouts.a]
+windows = [{ panes = [{}, { split = "diagonal" }] }]`,
+		"bad size": `base_dirs = ["/tmp"]
+[layouts.a]
+windows = [{ panes = [{}, { size = 100 }] }]`,
+		"first pane splits": `base_dirs = ["/tmp"]
+[layouts.a]
+windows = [{ panes = [{ split = "right" }] }]`,
+	}
+	for name, content := range cases {
+		t.Run(name, func(t *testing.T) {
+			home := t.TempDir()
+			t.Setenv("HOME", home)
+			writeConfig(t, home, content)
+			if _, err := Load(); err == nil {
+				t.Error("expected an error")
+			}
+		})
+	}
+}
+
+func TestLoad_tmuxinatorKeysAreRejected(t *testing.T) {
+	for _, key := range []string{
+		`use_tmuxinator = "auto"`,
+		`tmuxinator_layout = "dev"`,
+	} {
+		t.Run(key, func(t *testing.T) {
+			home := t.TempDir()
+			t.Setenv("HOME", home)
+			writeConfig(t, home, "base_dirs = [\"/tmp\"]\n"+key)
+			_, err := Load()
+			if err == nil || !strings.Contains(err.Error(), "layouts") {
+				t.Errorf("err = %v, want a hint about layouts", err)
 			}
 		})
 	}

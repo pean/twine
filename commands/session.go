@@ -89,8 +89,12 @@ func runSession(cmd *cobra.Command, args []string) error {
 		repoName := strings.TrimLeft(filepath.Base(dir), ".")
 		name := cfg.SessionPrefix + repoName
 		// Layouts only apply to git repos.
+		var layout *mux.Layout
+		if git.IsGitRepo(dir) {
+			layout = cfg.LayoutFor(repoName)
+		}
 		m, err := ensureSession(set, repoName, name, dir, mux.NewSessionOptions{
-			UseLayout: git.IsGitRepo(dir),
+			Layout: layout,
 		})
 		if err != nil {
 			return err
@@ -125,7 +129,7 @@ func runSession(cmd *cobra.Command, args []string) error {
 			}
 
 			m, err := ensureSession(set, target, name, repoPath, mux.NewSessionOptions{
-				UseLayout: true,
+				Layout: cfg.LayoutFor(target),
 			})
 			if err != nil {
 				return err

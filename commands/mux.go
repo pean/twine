@@ -21,13 +21,8 @@ var muxFlag string
 
 // backends returns every backend twine supports, in the priority order
 // "auto" uses when twine runs inside none of them.
-func backends(cfg *config.Config) []mux.Multiplexer {
-	opts := tmux.Options{}
-	if cfg != nil {
-		opts.UseTmuxinator = cfg.ShouldUseTmuxinator()
-		opts.TmuxinatorLayout = cfg.TmuxinatorLayout
-	}
-	return []mux.Multiplexer{tmux.New(opts), rex.New()}
+func backends() []mux.Multiplexer {
+	return []mux.Multiplexer{tmux.New(), rex.New()}
 }
 
 // muxSet returns the backends for cfg with the selection rules applied:
@@ -58,7 +53,7 @@ func muxSet(cfg *config.Config) (*mux.Set, error) {
 			return mux.Choice{Name: mux.Auto}
 		}
 	}
-	return mux.NewSet(backends(cfg), choose), nil
+	return mux.NewSet(backends(), choose), nil
 }
 
 // ensureSession returns the backend holding the session name, creating it in

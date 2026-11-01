@@ -1,5 +1,4 @@
-// Package tmux is the tmux backend for twine, with optional tmuxinator
-// layouts.
+// Package tmux is the tmux backend for twine.
 package tmux
 
 import (
@@ -13,19 +12,13 @@ import (
 	"github.com/pean/twine/internal/mux"
 )
 
-// Options configures the tmux backend.
-type Options struct {
-	// UseTmuxinator creates sessions through tmuxinator when the caller
-	// asks for a layout.
-	UseTmuxinator bool
-	// TmuxinatorLayout is the tmuxinator project to start. Defaults to "dev".
-	TmuxinatorLayout string
-}
-
 // Backend drives tmux through its CLI.
 type Backend struct {
-	opts Options
+	run runFunc
 }
+
+// runFunc runs tmux with args and returns its combined output.
+type runFunc func(args ...string) (string, error)
 
 var (
 	_ mux.Multiplexer   = (*Backend)(nil)
@@ -33,8 +26,13 @@ var (
 )
 
 // New returns a tmux backend.
-func New(opts Options) *Backend {
-	return &Backend{opts: opts}
+func New() *Backend {
+	return &Backend{run: execTmux}
+}
+
+func execTmux(args ...string) (string, error) {
+	out, err := exec.Command("tmux", args...).CombinedOutput()
+	return strings.TrimSpace(string(out)), err
 }
 
 // Name implements mux.Multiplexer.
@@ -96,37 +94,117 @@ func (b *Backend) NewSession(
 	name, dir string,
 	opts mux.NewSessionOptions,
 ) error {
-	if opts.UseLayout && b.opts.UseTmuxinator {
-		return b.startTmuxinator(name, dir)
+	if opts.Layout == nil || len(opts.Layout.Windows) == 0 {
+		out, err := b.run("new-session", "-d", "-s", name, "-c", dir)
+		if err != nil {
+			return newSessionError(err, out)
+		}
+		return nil
 	}
-	out, err := exec.Command(
-		"tmux", "new-session", "-d", "-s", name, "-c", dir,
-	).CombinedOutput()
-	if err != nil {
-		return newSessionError(err, string(out))
+	if err := b.buildLayout(name, dir, *opts.Layout); err != nil {
+		// Do not leave a half-built session behind.
+		_, _ = b.run("kill-session", "-t", name)
+		return err
 	}
 	return nil
 }
 
 func newSessionError(err error, output string) error {
-	msg := strings.TrimSpace(output)
-	if strings.Contains(msg, "duplicate session") {
-		return fmt.Errorf("%w: %s", mux.ErrSessionExists, msg)
+	if strings.Contains(output, "duplicate session") {
+		return fmt.Errorf("%w: %s", mux.ErrSessionExists, output)
 	}
-	if msg != "" {
-		return fmt.Errorf("%w: %s", err, msg)
+	if output != "" {
+		return fmt.Errorf("%w: %s", err, output)
 	}
 	return err
 }
 
-func (b *Backend) startTmuxinator(name, dir string) error {
-	layout := b.opts.TmuxinatorLayout
-	if layout == "" {
-		layout = "dev"
+// buildLayout creates the session with its first window, then adds the
+// remaining panes and windows, and leaves the first pane of the first window
+// selected.
+func (b *Backend) buildLayout(name, dir string, l mux.Layout) error {
+	var firstPanes []string
+	for i, w := range l.Windows {
+		args := []string{"-c", dir, "-P", "-F", "#{pane_id}"}
+		if w.Name != "" {
+			args = append(args, "-n", w.Name)
+		}
+		if i == 0 {
+			args = append([]string{"new-session", "-d", "-s", name}, args...)
+		} else {
+			args = append([]string{"new-window", "-t", name + ":"}, args...)
+		}
+		first, err := b.run(args...)
+		if err != nil {
+			if i == 0 {
+				return newSessionError(err, first)
+			}
+			return fmt.Errorf("window %q: %w: %s", w.Name, err, first)
+		}
+		if err := b.fillWindow(first, dir, w); err != nil {
+			return err
+		}
+		firstPanes = append(firstPanes, first)
 	}
-	c := exec.Command("tmuxinator", "start", "-n", name, layout, "false")
-	c.Dir = dir
-	return c.Run()
+	// Each window ends up with its last split pane active, so reselect the
+	// first one, then show the first window.
+	for _, pane := range firstPanes {
+		if out, err := b.run("select-pane", "-t", pane); err != nil {
+			return fmt.Errorf("selecting pane: %w: %s", err, out)
+		}
+	}
+	if out, err := b.run("select-window", "-t", firstPanes[0]); err != nil {
+		return fmt.Errorf("selecting window: %w: %s", err, out)
+	}
+	return nil
+}
+
+// fillWindow splits first into the window's remaining panes and types the
+// commands.
+func (b *Backend) fillWindow(first, dir string, w mux.LayoutWindow) error {
+	prev := first
+	for i, p := range w.Panes {
+		pane := first
+		if i > 0 {
+			args := []string{
+				"split-window", "-t", prev, "-c", dir, "-P", "-F", "#{pane_id}",
+				"-l", fmt.Sprintf("%d%%", p.SplitSize()),
+			}
+			args = append(args, splitFlags(p.SplitDirection())...)
+			out, err := b.run(args...)
+			if err != nil {
+				return fmt.Errorf("splitting pane: %w: %s", err, out)
+			}
+			pane = out
+		}
+		if p.Command != "" {
+			// -l types the text as is, so words like "Enter" stay text.
+			out, err := b.run("send-keys", "-t", pane, "-l", p.Command)
+			if err == nil {
+				out, err = b.run("send-keys", "-t", pane, "Enter")
+			}
+			if err != nil {
+				return fmt.Errorf("starting %q: %w: %s", p.Command, err, out)
+			}
+		}
+		prev = pane
+	}
+	return nil
+}
+
+// splitFlags returns split-window's flags for placing the new pane. -b puts
+// it before (left of or above) the target.
+func splitFlags(direction string) []string {
+	switch direction {
+	case mux.SplitLeft:
+		return []string{"-h", "-b"}
+	case mux.SplitAbove:
+		return []string{"-v", "-b"}
+	case mux.SplitBelow:
+		return []string{"-v"}
+	default:
+		return []string{"-h"}
+	}
 }
 
 // KillSession implements mux.Multiplexer.
