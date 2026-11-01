@@ -208,3 +208,75 @@ func TestInside(t *testing.T) {
 		t.Error("Inside() false with REX_SESSION")
 	}
 }
+
+const panesJSON = `[
+  {"session":"proj/main","session_id":"session:1","block":"block:a",
+   "pid":100,"name":"claude","cwd":"/src/proj",
+   "status":{"state":"working","app":"claude-code"}},
+  {"session":"proj/main","session_id":"session:1","block":"block:b",
+   "pid":101,"name":"-fish","cwd":"/src/proj"},
+  {"session":"other","session_id":"session:2","block":"block:c",
+   "pid":200,"name":"/opt/bin/opencode"}]`
+
+func TestListPanes(t *testing.T) {
+	b, f := newFake()
+	f.out["do"] = panesJSON
+	got, err := b.ListPanes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []mux.Pane{
+		{
+			PID: 100, Session: "proj/main", Path: "/src/proj",
+			Command: "claude", ID: "session:1/block:a",
+			Status: &mux.PaneStatus{State: "working", App: "claude-code"},
+		},
+		{
+			PID: 101, Session: "proj/main", Path: "/src/proj",
+			Command: "fish", ID: "session:1/block:b",
+		},
+		{PID: 200, Session: "other", Command: "opencode", ID: "session:2/block:c"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ListPanes() = %+v, want %+v", got, want)
+	}
+	if args := f.last(); args[0] != readOnly || args[1] != "do" {
+		t.Errorf("args = %v, want read-only do", args[:2])
+	}
+}
+
+func TestListPanesEmpty(t *testing.T) {
+	b, f := newFake()
+	f.out["do"] = "{}\n"
+	got, err := b.ListPanes()
+	if err != nil || len(got) != 0 {
+		t.Errorf("ListPanes() = %v, %v; want none", got, err)
+	}
+}
+
+func TestListPanesServerDown(t *testing.T) {
+	b, f := newFake()
+	f.err["do"] = errors.New("exit status 4")
+	if _, err := b.ListPanes(); err == nil {
+		t.Error("expected an error")
+	}
+}
+
+func TestCapturePaneTargetsSessionAndKeepsLastLines(t *testing.T) {
+	b, f := newFake()
+	f.out["capture"] = "one\ntwo\nthree\nfour\n"
+	got, err := b.CapturePane("session:1/block:a", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "three\nfour" {
+		t.Errorf("CapturePane() = %q, want last two lines", got)
+	}
+	want := []string{"capture", "-s", "session:1", "-b", "block:a", "--trim"}
+	if !reflect.DeepEqual(f.last(), want) {
+		t.Errorf("args = %v, want %v", f.last(), want)
+	}
+	if _, err := b.CapturePane("no-separator", 2); err == nil {
+		t.Error("expected an error for a malformed pane id")
+	}
+}

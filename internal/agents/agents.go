@@ -117,8 +117,11 @@ func findClaudeAgents(inspector mux.PaneInspector) ([]Agent, error) {
 			model = "unknown"
 		}
 
-		content, _ := inspector.CapturePane(pane.ID, 10)
-		state := detectClaudeState(content)
+		state, ok := stateFromStatus(pane.Status, "claude-code")
+		if !ok {
+			content, _ := inspector.CapturePane(pane.ID, 10)
+			state = detectClaudeState(content)
+		}
 
 		shortDir := shortenPath(dir, home)
 		result = append(result, Agent{
@@ -174,8 +177,11 @@ func findOpenCodeAgents(inspector mux.PaneInspector) ([]Agent, error) {
 		if !strings.EqualFold(p.Command, "opencode") {
 			continue
 		}
-		content, _ := inspector.CapturePane(p.ID, 20)
-		state := detectOpenCodeState(content)
+		state, ok := stateFromStatus(p.Status, "opencode")
+		if !ok {
+			content, _ := inspector.CapturePane(p.ID, 20)
+			state = detectOpenCodeState(content)
+		}
 		result = append(result, Agent{
 			Type:      AgentOpenCode,
 			State:     state,
@@ -186,6 +192,23 @@ func findOpenCodeAgents(inspector mux.PaneInspector) ([]Agent, error) {
 		})
 	}
 	return result, nil
+}
+
+// stateFromStatus maps a state the agent reported itself. It reports false
+// when there is no report from app, so the caller reads the screen instead.
+func stateFromStatus(s *mux.PaneStatus, app string) (AgentState, bool) {
+	if s == nil || s.App != app {
+		return "", false
+	}
+	switch s.State {
+	case "working":
+		return StateWorking, true
+	case "blocked":
+		return StateInput, true
+	case "idle", "done", "error":
+		return StateIdle, true
+	}
+	return "", false
 }
 
 func detectClaudeState(content string) AgentState {

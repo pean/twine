@@ -3,6 +3,7 @@ package rex
 
 import (
 	"bytes"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -23,7 +24,15 @@ type Backend struct {
 	run runFunc
 }
 
-var _ mux.Multiplexer = (*Backend)(nil)
+var (
+	_ mux.Multiplexer   = (*Backend)(nil)
+	_ mux.PaneInspector = (*Backend)(nil)
+)
+
+// panesScript lists every terminal in one connection to the server.
+//
+//go:embed panes.lua
+var panesScript string
 
 // New returns a Rex backend.
 func New() *Backend {
@@ -196,4 +205,67 @@ func (b *Backend) appClient() (string, error) {
 		}
 	}
 	return "", fmt.Errorf("no Rex app is connected; open Rex to view it")
+}
+
+type paneJSON struct {
+	Session   string `json:"session"`
+	SessionID string `json:"session_id"`
+	Block     string `json:"block"`
+	PID       int    `json:"pid"`
+	Name      string `json:"name"`
+	Cwd       string `json:"cwd"`
+	Status    *struct {
+		State string `json:"state"`
+		App   string `json:"app"`
+	} `json:"status"`
+}
+
+// ListPanes implements mux.PaneInspector. Each pane's PID is its foreground
+// process, so an agent started there matches without walking its ancestors.
+func (b *Backend) ListPanes() ([]mux.Pane, error) {
+	out, err := b.run(readOnly, "do", "-e", panesScript)
+	if err != nil {
+		return nil, err
+	}
+	// Lua encodes an empty list as an object.
+	if strings.TrimSpace(string(out)) == "{}" {
+		return nil, nil
+	}
+	var raw []paneJSON
+	if err := json.Unmarshal(out, &raw); err != nil {
+		return nil, fmt.Errorf("parsing rex panes: %w", err)
+	}
+	panes := make([]mux.Pane, 0, len(raw))
+	for _, r := range raw {
+		p := mux.Pane{
+			PID:     r.PID,
+			Session: r.Session,
+			Path:    r.Cwd,
+			Command: strings.TrimPrefix(filepath.Base(r.Name), "-"),
+			ID:      r.SessionID + "/" + r.Block,
+		}
+		if r.Status != nil {
+			p.Status = &mux.PaneStatus{State: r.Status.State, App: r.Status.App}
+		}
+		panes = append(panes, p)
+	}
+	return panes, nil
+}
+
+// CapturePane implements mux.PaneInspector. Rex has no way to ask for only
+// the last lines, so it reads the whole screen and scrollback.
+func (b *Backend) CapturePane(paneID string, lines int) (string, error) {
+	sessionID, blockID, ok := strings.Cut(paneID, "/")
+	if !ok {
+		return "", fmt.Errorf("bad rex pane id %q", paneID)
+	}
+	out, err := b.run("capture", "-s", sessionID, "-b", blockID, "--trim")
+	if err != nil {
+		return "", err
+	}
+	all := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
+	if len(all) > lines {
+		all = all[len(all)-lines:]
+	}
+	return strings.Join(all, "\n"), nil
 }

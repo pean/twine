@@ -19,13 +19,25 @@ type Session struct {
 	Windows int
 }
 
-// Pane describes one terminal inside a session.
+// Pane describes one terminal inside a session. PID is a process in the pane
+// that an agent's ancestry may lead to; ID is opaque to callers.
 type Pane struct {
 	PID     int
 	Session string
 	Path    string
 	Command string
 	ID      string
+	// Status is what a program in the pane reports about itself. Nil when the
+	// backend has no such reports or nothing has reported.
+	Status *PaneStatus
+}
+
+// PaneStatus is a program's self-reported state.
+type PaneStatus struct {
+	// State is idle, working, done, blocked, or error.
+	State string
+	// App identifies the reporting program, such as claude-code.
+	App string
 }
 
 // NewSessionOptions controls how a session is created.

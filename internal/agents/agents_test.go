@@ -62,3 +62,47 @@ func TestFindOpenCodeAgents(t *testing.T) {
 		t.Errorf("unexpected agent %+v", a)
 	}
 }
+
+func TestStateFromStatus(t *testing.T) {
+	claude := func(state string) *mux.PaneStatus {
+		return &mux.PaneStatus{State: state, App: "claude-code"}
+	}
+	cases := []struct {
+		desc   string
+		status *mux.PaneStatus
+		want   AgentState
+		ok     bool
+	}{
+		{"working", claude("working"), StateWorking, true},
+		{"blocked", claude("blocked"), StateInput, true},
+		{"idle", claude("idle"), StateIdle, true},
+		{"done", claude("done"), StateIdle, true},
+		{"error", claude("error"), StateIdle, true},
+		{"unknown state", claude("later"), "", false},
+		{"other app", &mux.PaneStatus{State: "working", App: "cargo"}, "", false},
+		{"no status", nil, "", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			got, ok := stateFromStatus(tc.status, "claude-code")
+			if got != tc.want || ok != tc.ok {
+				t.Errorf("got %q, %v; want %q, %v", got, ok, tc.want, tc.ok)
+			}
+		})
+	}
+}
+
+func TestFindOpenCodeAgentsPrefersReportedStatus(t *testing.T) {
+	inspector := fakeInspector{
+		panes: []mux.Pane{{
+			Session: "proj/main", Command: "opencode", ID: "%1",
+			Status: &mux.PaneStatus{State: "blocked", App: "opencode"},
+		}},
+		// The screen says working; the program's own report wins.
+		screens: map[string]string{"%1": "Executing tool"},
+	}
+	got, _ := findOpenCodeAgents(inspector)
+	if len(got) != 1 || got[0].State != StateInput {
+		t.Errorf("findOpenCodeAgents() = %+v, want state %q", got, StateInput)
+	}
+}

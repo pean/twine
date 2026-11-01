@@ -9,7 +9,7 @@ Usage:
   twine [command]
 
 Available Commands:
-  agents      List and switch to AI coding agents in tmux
+  agents      List and switch to AI coding agents in your sessions
   install     Set up config, aliases, and completions
   kill        Kill tmux sessions with optional worktree removal
   prune       Clean up gone branches, worktrees, and sessions
@@ -119,7 +119,9 @@ attach, so switching asks the Rex app to show the session. The app only accepts 
 when **Remote Control** is on in its settings (Rex Server). Without it, twine still
 creates the session and prints the setting to turn on.
 
-Layouts (`tmuxinator_layout`) and the `agents` dashboard are tmux-only for now.
+`twine agents` reads each agent's own status from Rex (Claude Code reports
+`working`, `blocked`, and so on), so it does not read the screen unless an agent
+reports nothing. Layouts (`tmuxinator_layout`) are tmux-only for now.
 `rex` must be on `PATH`; Rex adds it inside its own terminals.
 
 ## Commands
@@ -178,7 +180,7 @@ twine prune --dry-run           # preview
 
 ### `twine agents`
 
-Dashboard for AI coding agents running in tmux sessions. Detects Claude Code and OpenCode, shows their state, and lets you switch to them.
+Dashboard for AI coding agents running in tmux or rex sessions. Detects Claude Code and OpenCode, shows their state, and lets you switch to them.
 
 ```sh
 twine agents
